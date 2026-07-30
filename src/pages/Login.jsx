@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { signInWithEmailAndPassword, signOut, sendEmailVerification } from 'firebase/auth';
-import { auth } from '../firebase';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import { Link, useNavigate } from 'react-router-dom';
 
 const Login = () => {
@@ -10,33 +11,20 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Resend Verification state
-  const [unverifiedUser, setUnverifiedUser] = useState(null);
-  const [cooldown, setCooldown] = useState(0);
-  const [resending, setResending] = useState(false);
-
-  useEffect(() => {
-    let timer;
-    if (cooldown > 0) {
-      timer = setInterval(() => {
-        setCooldown(prev => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [cooldown]);
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    setUnverifiedUser(null);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
-      if (!userCredential.user.emailVerified) {
+      // Cek apakah document user ada di Firestore
+      const userDocRef = doc(db, 'users', userCredential.user.uid);
+      const userSnap = await getDoc(userDocRef);
+      
+      if (!userSnap.exists()) {
         await signOut(auth);
-        setUnverifiedUser({ email, password });
-        setError('Email belum terverifikasi. Silakan cek inbox/spam email Anda untuk verifikasi.');
+        setError('Akun tidak terdaftar di database asrama.');
         setLoading(false);
         return;
       }
@@ -50,36 +38,6 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleResend = async () => {
-    if (!unverifiedUser || cooldown > 0) return;
-    
-    setResending(true);
-    try {
-      // Re-authenticate silently to send verification email
-      const userCredential = await signInWithEmailAndPassword(auth, unverifiedUser.email, unverifiedUser.password);
-      await sendEmailVerification(userCredential.user);
-      await signOut(auth);
-      
-      setCooldown(90); // 1.30 minutes (90 seconds)
-      alert("Link verifikasi telah dikirim ulang! Silakan cek kotak masuk atau spam.");
-    } catch (err) {
-      console.error(err);
-      if (err.code === 'auth/too-many-requests') {
-         alert("Terlalu banyak permintaan pengiriman email. Mohon tunggu beberapa saat lagi.");
-      } else {
-         alert("Gagal mengirim ulang link verifikasi. Coba lagi nanti.");
-      }
-    } finally {
-      setResending(false);
-    }
-  };
-
-  const formatTime = (seconds) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
   return (
@@ -112,28 +70,6 @@ const Login = () => {
             fontWeight: 600
           }}>
             <p style={{ margin: 0 }}>{error}</p>
-            {unverifiedUser && (
-              <button 
-                type="button" 
-                onClick={handleResend}
-                disabled={resending || cooldown > 0}
-                style={{ 
-                  marginTop: '12px', 
-                  padding: '10px 16px', 
-                  backgroundColor: cooldown > 0 ? '#E5E7EB' : '#F97316', 
-                  color: cooldown > 0 ? '#9CA3AF' : 'white', 
-                  border: 'none', 
-                  borderRadius: '24px', 
-                  cursor: cooldown > 0 ? 'not-allowed' : 'pointer',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  width: '100%',
-                  transition: 'background-color 0.2s'
-                }}
-              >
-                {resending ? 'Mengirim...' : cooldown > 0 ? `Kirim ulang dalam ${formatTime(cooldown)}` : 'Kirim Ulang Verifikasi'}
-              </button>
-            )}
           </div>
         )}
         
@@ -188,12 +124,8 @@ const Login = () => {
             />
           </div>
           
-          <div style={{ textAlign: 'right' }}>
-            <Link to="/forgot-password" style={{ fontSize: '0.9rem', color: '#F97316', fontWeight: 700, textDecoration: 'none' }}>Lupa Password?</Link>
-          </div>
-
           <button type="submit" disabled={loading} style={{
-            marginTop: '12px',
+            marginTop: '20px',
             padding: '16px',
             backgroundColor: loading ? '#FDBA74' : '#F97316',
             color: 'white',
@@ -213,11 +145,6 @@ const Login = () => {
             {loading ? 'Memproses...' : 'Masuk'}
           </button>
         </form>
-        
-        <div style={{ textAlign: 'center', marginTop: '32px', fontSize: '0.95rem', color: '#6B7280', fontWeight: 600 }}>
-          Belum punya akun?{' '}
-          <Link to="/signup" style={{ color: '#F97316', fontWeight: 800, textDecoration: 'none' }}>Daftar sekarang</Link>
-        </div>
       </div>
     </div>
   );

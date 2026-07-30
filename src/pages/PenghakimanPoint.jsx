@@ -3,6 +3,7 @@ import { db, auth } from '../firebase';
 import { collection, getDocs, doc, addDoc, getDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Search, UserCheck, X, Scale, AlertTriangle, Sparkles, Check, CheckCircle2 } from 'lucide-react';
+import { logToGoogleSheets, formatVerificationData } from '../context/sheetsService';
 
 const PenghakimanPoint = () => {
   const navigate = useNavigate();
@@ -160,11 +161,6 @@ const PenghakimanPoint = () => {
     setSubmitting(true);
 
     try {
-      // We will perform updates to Firestore
-      // To ensure atomicity or consistent batching, let's write documents in sequence.
-      // Firestore batch limits to 500 operations. We have selectedUsers.length * selectedPoints.length + selectedUsers.length operations.
-      // E.g., 2 users, 3 points = 6 histories + 2 user updates = 8 operations. Totally fine.
-      
       const batch = writeBatch(db);
 
       for (const u of selectedUsers) {
@@ -191,6 +187,22 @@ const PenghakimanPoint = () => {
       }
 
       await batch.commit();
+
+      // Log ke Google Sheets (async, non-blocking)
+      if (auth.currentUser) {
+        const formattedData = formatVerificationData('poin', {
+          selectedUsers: selectedUsers,
+          selectedPoints: selectedPoints,
+          totalDelta: totalDelta,
+          timestamp: new Date().toISOString()
+        });
+        logToGoogleSheets({
+          type: 'poin',
+          verificationData: formattedData,
+          verifierName: auth.currentUser.displayName || auth.currentUser.email || 'Unknown',
+          verifierId: auth.currentUser.uid
+        }).catch(err => console.warn('Sheets logging error:', err));
+      }
 
       alert("Penghakiman poin berhasil diproses!");
       navigate('/home');
@@ -227,15 +239,11 @@ const PenghakimanPoint = () => {
       <div style={{
         background: '#FFF9F5',
         minHeight: '100vh',
-        padding: '2rem 1.5rem',
+        fontFamily: '"Nunito", "Inter", sans-serif',
         display: 'flex',
-        flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        fontFamily: '"Nunito", "Inter", sans-serif',
-        maxWidth: '480px',
-        margin: '0 auto',
-        boxShadow: '0 0 20px rgba(0,0,0,0.05)'
+        padding: '2rem 1.5rem'
       }}>
         <div style={{
           backgroundColor: '#FFFFFF',
@@ -309,12 +317,13 @@ const PenghakimanPoint = () => {
     <div style={{
       background: '#FFF9F5',
       minHeight: '100vh',
-      padding: '2rem 1.5rem 100px 1.5rem',
-      position: 'relative',
       fontFamily: '"Nunito", "Inter", sans-serif',
+    }}>
+    <div style={{
       maxWidth: '480px',
       margin: '0 auto',
-      boxShadow: '0 0 20px rgba(0,0,0,0.05)'
+      padding: '2rem 1.5rem 100px 1.5rem',
+      position: 'relative',
     }}>
 
       {/* Header Halaman */}
@@ -815,6 +824,7 @@ const PenghakimanPoint = () => {
         </button>
       </form>
 
+    </div>
     </div>
   );
 };

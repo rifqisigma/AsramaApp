@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '../firebase';
-import { Link } from 'react-router-dom';
+import { auth, db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
 const ForgotPassword = () => {
@@ -9,6 +10,32 @@ const ForgotPassword = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isAllowed, setIsAllowed] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        navigate('/login');
+        return;
+      }
+      try {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userDocRef);
+        if (userSnap.exists() && userSnap.data().jabatan === 'mediadigi') {
+          setIsAllowed(true);
+        } else {
+          alert('Akses ditolak. Hanya jabatan mediadigi yang diizinkan untuk mereset password.');
+          navigate('/home');
+        }
+      } catch (err) {
+        console.error('Error checking access:', err);
+        navigate('/home');
+      }
+    };
+    checkAccess();
+  }, [navigate]);
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
@@ -27,6 +54,24 @@ const ForgotPassword = () => {
     }
   };
 
+  if (isAllowed === null) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#FFFFFF',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        fontFamily: '"Nunito", "Inter", sans-serif',
+        color: '#F97316',
+        fontWeight: 800,
+        fontSize: '1.2rem'
+      }}>
+        Memeriksa Hak Akses...
+      </div>
+    );
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -38,7 +83,7 @@ const ForgotPassword = () => {
     }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', maxWidth: '400px', margin: '0 auto', width: '100%', paddingTop: '16px' }}>
         
-        <Link to="/login" style={{ 
+        <Link to="/me" style={{ 
           display: 'inline-flex', 
           alignItems: 'center', 
           gap: '8px', 

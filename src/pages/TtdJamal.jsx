@@ -3,9 +3,13 @@ import { auth, db } from '../firebase';
 import { collection, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { ArrowLeft, CheckCircle, Clock, Users, User, FileImage, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { logToGoogleSheets, formatVerificationData } from '../context/sheetsService';
+import { useTheme } from '../context/ThemeContext';
 
 const TtdJamal = () => {
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [checkingRole, setCheckingRole] = useState(true);
@@ -103,10 +107,24 @@ const TtdJamal = () => {
     if (!window.confirm("Yakin ingin memverifikasi laporan jam malam ini?")) return;
 
     try {
+      const report = reports.find(r => r.id === reportId);
+      
       await updateDoc(doc(db, 'jamal', reportId), {
         verification: true,
         WhoVerification: doc(db, 'users', auth.currentUser.uid)
       });
+
+      // Log ke Google Sheets (async, non-blocking)
+      if (auth.currentUser) {
+        const formattedData = formatVerificationData('jamal', report);
+        logToGoogleSheets({
+          type: 'jamal',
+          verificationData: formattedData,
+          verifierName: auth.currentUser.displayName || auth.currentUser.email || 'Unknown',
+          verifierId: auth.currentUser.uid
+        }).catch(err => console.warn('Sheets logging error:', err));
+      }
+
       // Hapus dari daftar
       setReports(prev => prev.filter(r => r.id !== reportId));
       alert("Laporan jam malam berhasil diverifikasi!");
@@ -149,17 +167,27 @@ const TtdJamal = () => {
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays > 6) {
-      return <div style={{ padding: '6px 10px', borderRadius: '12px', backgroundColor: '#FEE2E2', color: '#DC2626', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>Kamu terlalu<br />lama ttd</div>;
+      return <div style={{ padding: '6px 10px', borderRadius: '12px', backgroundColor: isDark ? '#3D1A4A' : '#FEE2E2', color: '#DC2626', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>Kamu terlalu<br />lama ttd</div>;
     } else if (diffDays > 3) {
-      return <div style={{ padding: '6px 10px', borderRadius: '12px', backgroundColor: '#FEF3C7', color: '#D97706', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>Jangan lama<br />lama</div>;
+      return <div style={{ padding: '6px 10px', borderRadius: '12px', backgroundColor: isDark ? '#3D2A00' : '#FEF3C7', color: '#D97706', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>Jangan lama<br />lama</div>;
     } else {
-      return <div style={{ padding: '6px 10px', borderRadius: '12px', backgroundColor: '#D1FAE5', color: '#059669', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>Segera ttd<br />yaa</div>;
+      return <div style={{ padding: '6px 10px', borderRadius: '12px', backgroundColor: isDark ? '#1A2D1E' : '#D1FAE5', color: '#059669', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>Segera ttd<br />yaa</div>;
     }
   };
 
   if (checkingRole) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#F3F4F6', color: '#8B5CF6', fontFamily: '"Nunito", sans-serif', fontWeight: 800 }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: isDark ? '#1A1025' : '#F9F8FD',
+        color: '#8B5CF6',
+        fontFamily: '"Nunito", sans-serif',
+        fontWeight: 800,
+        transition: 'background-color 0.3s ease'
+      }}>
         Memverifikasi Jabatan Anda...
       </div>
     );
@@ -168,44 +196,45 @@ const TtdJamal = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: '#F9F8FD', // Light purple background tint
+      backgroundColor: isDark ? '#1A1025' : '#F9F8FD',
       fontFamily: '"Nunito", "Inter", sans-serif',
-      padding: '24px 16px 80px 16px'
+      padding: '24px 16px 80px 16px',
+      transition: 'background-color 0.3s ease'
     }}>
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         <Link to="/home" style={{
           display: 'inline-flex',
           alignItems: 'center',
           gap: '8px',
-          color: '#6B7280',
+          color: isDark ? '#A78BFA' : '#6B7280',
           textDecoration: 'none',
           fontWeight: 700,
           marginBottom: '24px',
-          backgroundColor: 'white',
+          backgroundColor: isDark ? '#2D1D45' : 'white',
           padding: '8px 16px',
           borderRadius: '20px',
-          boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-          border: '1px solid #ECE9F6'
+          boxShadow: isDark ? '0 2px 5px rgba(0,0,0,0.3)' : '0 2px 5px rgba(0,0,0,0.05)',
+          border: `1px solid ${isDark ? '#4C3080' : '#ECE9F6'}`,
+          transition: 'all 0.3s ease'
         }}>
           <ArrowLeft size={18} />
           Kembali
         </Link>
 
         <div style={{
-          backgroundColor: '#FFFFFF',
+          backgroundColor: isDark ? '#2D1D45' : '#FFFFFF',
           borderRadius: '16px',
           padding: '32px 24px',
-          borderTop: '10px solid #8B5CF6', // Purple color for Jamal
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.03)',
-          borderLeft: '1px solid #ECE9F6',
-          borderRight: '1px solid #ECE9F6',
-          borderBottom: '1px solid #ECE9F6',
-          marginBottom: '16px'
+          borderTop: '10px solid #8B5CF6',
+          boxShadow: isDark ? '0 4px 6px rgba(0,0,0,0.4)' : '0 4px 6px rgba(0, 0, 0, 0.03)',
+          border: `1px solid ${isDark ? '#4C3080' : '#ECE9F6'}`,
+          marginBottom: '16px',
+          transition: 'all 0.3s ease'
         }}>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1C1C1E', margin: '0 0 12px 0' }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: isDark ? '#FFFFFF' : '#1C1C1E', margin: '0 0 12px 0' }}>
             Tanda Tangan Jam Malam
           </h1>
-          <p style={{ color: '#6B7280', margin: 0, fontSize: '1rem', fontWeight: 600 }}>
+          <p style={{ color: isDark ? '#C4B5FD' : '#6B7280', margin: 0, fontSize: '1rem', fontWeight: 600 }}>
             Daftar laporan jam malam yang menunggu verifikasi dari Kepenghunian.
           </p>
         </div>
@@ -213,30 +242,31 @@ const TtdJamal = () => {
         {loading ? (
           <p style={{ textAlign: 'center', color: '#8B5CF6', fontWeight: 700, marginTop: '40px' }}>Memuat laporan jam malam...</p>
         ) : reports.length === 0 ? (
-          <div style={{ textAlign: 'center', backgroundColor: 'white', padding: '40px 20px', borderRadius: '16px', border: '1px solid #ECE9F6' }}>
+          <div style={{ textAlign: 'center', backgroundColor: isDark ? '#2D1D45' : 'white', padding: '40px 20px', borderRadius: '16px', border: `1px solid ${isDark ? '#4C3080' : '#ECE9F6'}` }}>
             <CheckCircle size={48} color="#8B5CF6" style={{ marginBottom: '16px' }} />
-            <h3 style={{ margin: '0 0 8px 0', color: '#1F2937', fontWeight: 800 }}>Semua Laporan Selesai!</h3>
-            <p style={{ margin: 0, color: '#6B7280', fontWeight: 600 }}>Tidak ada laporan jam malam yang perlu diverifikasi saat ini.</p>
+            <h3 style={{ margin: '0 0 8px 0', color: isDark ? '#FFFFFF' : '#1F2937', fontWeight: 800 }}>Semua Laporan Selesai!</h3>
+            <p style={{ margin: 0, color: isDark ? '#9CA3AF' : '#6B7280', fontWeight: 600 }}>Tidak ada laporan jam malam yang perlu diverifikasi saat ini.</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {reports.map((report) => (
               <div key={report.id} style={{
-                backgroundColor: 'white',
+                backgroundColor: isDark ? '#2D1D45' : 'white',
                 borderRadius: '16px',
                 padding: '20px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.03)',
-                border: '1px solid #ECE9F6'
+                boxShadow: isDark ? '0 4px 6px rgba(0,0,0,0.4)' : '0 4px 6px rgba(0,0,0,0.03)',
+                border: `1px solid ${isDark ? '#4C3080' : '#ECE9F6'}`,
+                transition: 'all 0.3s ease'
               }}>
                 {/* Card Header: Badges & General Info */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid #F3F4F6' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '16px', borderBottom: `1px solid ${isDark ? '#4C3080' : '#F3F4F6'}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: '#F5F3FF', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#8B5CF6', fontWeight: 800, fontSize: '1.2rem' }}>
+                    <div style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: isDark ? '#3D2060' : '#F5F3FF', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#8B5CF6', fontWeight: 800, fontSize: '1.2rem' }}>
                       <Users size={22} />
                     </div>
                     <div>
-                      <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: '#1F2937', fontWeight: 800 }}>Laporan Jam Malam</h3>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#6B7280', fontWeight: 700 }}>
+                      <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: isDark ? '#FFFFFF' : '#1F2937', fontWeight: 800 }}>Laporan Jam Malam</h3>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: isDark ? '#9CA3AF' : '#6B7280', fontWeight: 700 }}>
                         <Clock size={14} />
                         {formatTimestamp(report.timestamp)}
                       </div>
@@ -247,21 +277,21 @@ const TtdJamal = () => {
 
                 {/* Card Body: Petugas list chips */}
                 <div style={{ marginBottom: '20px' }}>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 700, color: '#374151' }}>Penghuni Bertugas:</p>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 700, color: isDark ? '#E5E7EB' : '#374151' }}>Penghuni Bertugas:</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {report.usersList.length > 0 ? (
                       report.usersList.map((user, idx) => (
                         <span key={idx} style={{
                           padding: '6px 12px',
-                          backgroundColor: '#F3E8FF',
-                          color: '#7E22CE',
+                          backgroundColor: isDark ? '#3D2060' : '#F3E8FF',
+                          color: isDark ? '#C4B5FD' : '#7E22CE',
                           borderRadius: '20px',
                           fontSize: '0.85rem',
                           fontWeight: 700,
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '4px',
-                          border: '1px solid #E9D5FF'
+                          border: `1px solid ${isDark ? '#5B30A0' : '#E9D5FF'}`
                         }}>
                           <User size={12} />
                           {user.name} ({user.angkatan})
@@ -276,7 +306,7 @@ const TtdJamal = () => {
                 {/* Bukti Links */}
                 {report.buktiLink && report.buktiLink.length > 0 && (
                   <div style={{ marginBottom: '20px' }}>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 700, color: '#374151' }}>Bukti Laporan:</p>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 700, color: isDark ? '#E5E7EB' : '#374151' }}>Bukti Laporan:</p>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {report.buktiLink.map((url, i) => (
                         <div
@@ -285,14 +315,14 @@ const TtdJamal = () => {
                           style={{
                             width: '70px',
                             height: '70px',
-                            backgroundColor: '#F3F4F6',
+                            backgroundColor: isDark ? '#1A1025' : '#F3F4F6',
                             borderRadius: '12px',
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'center',
                             alignItems: 'center',
                             cursor: 'pointer',
-                            border: '1px solid #E5E7EB',
+                            border: `1px solid ${isDark ? '#4C3080' : '#E5E7EB'}`,
                             overflow: 'hidden'
                           }}
                         >
@@ -315,7 +345,7 @@ const TtdJamal = () => {
                   style={{
                     width: '100%',
                     padding: '14px',
-                    backgroundColor: '#8B5CF6', // Purple theme
+                    backgroundColor: '#8B5CF6',
                     color: 'white',
                     border: 'none',
                     borderRadius: '12px',

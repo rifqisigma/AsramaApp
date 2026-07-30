@@ -3,13 +3,16 @@ import { db } from '../firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, Calendar, User, Info, X } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 
 const SeePoints = () => {
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [points, setPoints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Bottom Sheet State
   const [selectedPoint, setSelectedPoint] = useState(null);
   const [creatorName, setCreatorName] = useState('');
@@ -23,10 +26,10 @@ const SeePoints = () => {
         snap.forEach(d => {
           list.push({ id: d.id, ...d.data() });
         });
-        
+
         // Urutkan berdasarkan timestamp desc (terbaru dulu)
         list.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-        
+
         setPoints(list);
       } catch (error) {
         console.error("Error fetching system points:", error);
@@ -82,57 +85,59 @@ const SeePoints = () => {
     });
   };
 
-  const filteredPoints = points.filter(p => 
+  const filteredPoints = points.filter(p =>
     (p.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (p.desc || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <div style={{
-      background: '#FFF9F5',
+      background: isDark ? '#1E130C' : '#FFF9F5',
       minHeight: '100vh',
-      padding: '2rem 1.5rem 100px 1.5rem',
-      position: 'relative',
       fontFamily: '"Nunito", "Inter", sans-serif',
+      transition: 'background-color 0.3s ease'
+    }}>
+    <div style={{
       maxWidth: '480px',
       margin: '0 auto',
-      boxShadow: '0 0 20px rgba(0,0,0,0.05)'
+      padding: '2rem 1.5rem 120px 1.5rem',
+      position: 'relative',
     }}>
 
       {/* Header Halaman */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: '16px', 
-        marginBottom: '1.5rem' 
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        marginBottom: '1.5rem'
       }}>
-        <button 
+        <button
           onClick={() => navigate('/home')}
           style={{
-            background: '#FFFFFF',
-            border: '2px solid #FFEDD5',
+            background: isDark ? '#2D1D13' : '#FFFFFF',
+            border: isDark ? '2px solid #4A2E1E' : '2px solid #FFEDD5',
             borderRadius: '16px',
             padding: '10px',
             cursor: 'pointer',
             color: '#F97316',
-            boxShadow: '0 4px 0 #FFEDD5',
+            boxShadow: isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FFEDD5',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'transform 0.1s, box-shadow 0.1s',
+            transition: 'transform 0.1s, box-shadow 0.1s, background-color 0.3s, border-color 0.3s',
             outline: 'none'
           }}
           onMouseDown={(e) => {
             e.currentTarget.style.transform = 'translateY(2px)';
-            e.currentTarget.style.boxShadow = '0 2px 0 #FFEDD5';
+            e.currentTarget.style.boxShadow = isDark ? '0 2px 0 #4A2E1E' : '0 2px 0 #FFEDD5';
           }}
           onMouseUp={(e) => {
             e.currentTarget.style.transform = 'translateY(0px)';
-            e.currentTarget.style.boxShadow = '0 4px 0 #FFEDD5';
+            e.currentTarget.style.boxShadow = isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FFEDD5';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'translateY(0px)';
-            e.currentTarget.style.boxShadow = '0 4px 0 #FFEDD5';
+            e.currentTarget.style.boxShadow = isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FFEDD5';
           }}
         >
           <ArrowLeft size={20} strokeWidth={3} />
@@ -146,7 +151,7 @@ const SeePoints = () => {
           }}>
             Jenis Poin Asrama
           </h1>
-          <p style={{ color: '#FB923C', margin: '0.25rem 0 0 0', fontWeight: 600 }}>
+          <p style={{ color: isDark ? '#FED7AA' : '#FB923C', margin: '0.25rem 0 0 0', fontWeight: 600 }}>
             Ketentuan poin penambahan & pengurangan
           </p>
         </div>
@@ -166,26 +171,27 @@ const SeePoints = () => {
             width: '100%',
             padding: '14px 14px 14px 44px',
             borderRadius: '16px',
-            border: '2px solid #FFEDD5',
+            border: isDark ? '2px solid #4A2E1E' : '2px solid #FFEDD5',
             fontSize: '1rem',
             outline: 'none',
             fontFamily: '"Nunito", "Inter", sans-serif',
-            boxShadow: '0 4px 0 #FFEDD5',
-            backgroundColor: '#FFFFFF',
+            boxShadow: isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FFEDD5',
+            backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
             fontWeight: 650,
-            color: '#1F2937'
+            color: isDark ? '#FFFFFF' : '#1F2937',
+            transition: 'all 0.3s ease'
           }}
         />
-        <Search 
-          size={20} 
-          color="#FB923C" 
+        <Search
+          size={20}
+          color="#FB923C"
           style={{
             position: 'absolute',
             left: '16px',
             top: '50%',
             transform: 'translateY(-50%)',
             pointerEvents: 'none'
-          }} 
+          }}
         />
       </div>
 
@@ -195,14 +201,15 @@ const SeePoints = () => {
           Memuat daftar poin...
         </div>
       ) : filteredPoints.length === 0 ? (
-        <div style={{ 
-          textAlign: 'center', 
-          padding: '3rem 0', 
-          backgroundColor: '#FFFFFF', 
-          borderRadius: '24px', 
-          border: '2px dashed #FFEDD5',
+        <div style={{
+          textAlign: 'center',
+          padding: '3rem 0',
+          backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+          borderRadius: '24px',
+          border: isDark ? '2px dashed #4A2E1E' : '2px dashed #FFEDD5',
           color: '#FB923C',
-          fontWeight: 700
+          fontWeight: 700,
+          transition: 'all 0.3s ease'
         }}>
           Tidak ada ketentuan poin ditemukan.
         </div>
@@ -215,16 +222,16 @@ const SeePoints = () => {
                 key={point.id}
                 onClick={() => setSelectedPoint(point)}
                 style={{
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
                   borderRadius: '20px',
                   padding: '16px 20px',
-                  border: '2px solid #FFEDD5',
-                  boxShadow: '0 6px 0 #FFEDD5',
+                  border: isDark ? '2px solid #4A2E1E' : '2px solid #FFEDD5',
+                  boxShadow: isDark ? '0 6px 0 #4A2E1E' : '0 6px 0 #FFEDD5',
                   cursor: 'pointer',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  transition: 'transform 0.15s ease',
+                  transition: 'transform 0.15s ease, background-color 0.3s, border-color 0.3s, box-shadow 0.3s',
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
                 onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0px)'}
@@ -236,14 +243,15 @@ const SeePoints = () => {
                     margin: 0,
                     fontSize: '1.05rem',
                     fontWeight: 800,
-                    color: '#1F2937',
+                    color: isDark ? '#FFFFFF' : '#1F2937',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    transition: 'color 0.3s'
                   }}>
                     {point.name}
                   </h3>
-                  
+
                   {/* Badge Tipe */}
                   <span style={{
                     display: 'inline-block',
@@ -254,7 +262,7 @@ const SeePoints = () => {
                     letterSpacing: '0.05em',
                     padding: '3px 8px',
                     borderRadius: '8px',
-                    backgroundColor: isNegative ? '#FEE2E2' : '#E6F4EA',
+                    backgroundColor: isNegative ? (isDark ? '#5C2222' : '#FEE2E2') : (isDark ? '#1C3D27' : '#E6F4EA'),
                     color: isNegative ? '#EF4444' : '#10B981'
                   }}>
                     {point.type === 'pengurangan' ? 'Pengurangan' : 'Penambahan'}
@@ -265,7 +273,7 @@ const SeePoints = () => {
                 <div style={{
                   padding: '8px 16px',
                   borderRadius: '12px',
-                  backgroundColor: isNegative ? '#FEF2F2' : '#F0FDF4',
+                  backgroundColor: isNegative ? (isDark ? '#3C1C1C' : '#FEF2F2') : (isDark ? '#1C3D27' : '#F0FDF4'),
                   border: `2px solid ${isNegative ? '#FCA5A5' : '#86EFAC'}`,
                   color: isNegative ? '#EF4444' : '#10B981',
                   fontWeight: 900,
@@ -301,7 +309,7 @@ const SeePoints = () => {
         >
           {/* Bottom Sheet Container */}
           <div style={{
-            backgroundColor: '#FFFFFF',
+            backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
             width: '100%',
             maxWidth: '480px',
             borderTopLeftRadius: '32px',
@@ -314,8 +322,9 @@ const SeePoints = () => {
             maxHeight: '85vh',
             overflowY: 'auto',
             animation: 'slideUp 0.25s ease-out forwards',
-            border: '3px solid #FFEDD5',
-            borderBottom: 'none'
+            border: `3px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+            borderBottom: 'none',
+            transition: 'all 0.3s ease'
           }}
             onClick={(e) => e.stopPropagation()} // Prevent close on card click
           >
@@ -323,7 +332,7 @@ const SeePoints = () => {
             <div style={{
               width: '40px',
               height: '4px',
-              backgroundColor: '#E5E7EB',
+              backgroundColor: isDark ? '#4A2E1E' : '#E5E7EB',
               borderRadius: '2px',
               alignSelf: 'center',
               marginBottom: '4px'
@@ -339,26 +348,26 @@ const SeePoints = () => {
                   letterSpacing: '0.05em',
                   padding: '4px 10px',
                   borderRadius: '8px',
-                  backgroundColor: selectedPoint.point < 0 ? '#FEE2E2' : '#E6F4EA',
+                  backgroundColor: selectedPoint.point < 0 ? (isDark ? '#5C2222' : '#FEE2E2') : (isDark ? '#1C3D27' : '#E6F4EA'),
                   color: selectedPoint.point < 0 ? '#EF4444' : '#10B981',
                   display: 'inline-block',
                   marginBottom: '8px'
                 }}>
                   {selectedPoint.type === 'pengurangan' ? 'Pengurangan Poin' : 'Penambahan Poin'}
                 </span>
-                <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#1F2937', lineHeight: 1.2 }}>
+                <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: isDark ? '#FFFFFF' : '#1F2937', lineHeight: 1.2 }}>
                   {selectedPoint.name}
                 </h2>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedPoint(null)}
                 style={{
-                  background: '#F3F4F6',
+                  background: isDark ? '#3D291C' : '#F3F4F6',
                   border: 'none',
                   borderRadius: '50%',
                   padding: '8px',
                   cursor: 'pointer',
-                  color: '#6B7280',
+                  color: isDark ? '#D1D5DB' : '#6B7280',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
@@ -375,7 +384,7 @@ const SeePoints = () => {
               justifyContent: 'center',
               padding: '20px',
               borderRadius: '24px',
-              backgroundColor: selectedPoint.point < 0 ? '#FEF2F2' : '#F0FDF4',
+              backgroundColor: selectedPoint.point < 0 ? (isDark ? '#3C1C1C' : '#FEF2F2') : (isDark ? '#1C3D27' : '#F0FDF4'),
               border: `2px solid ${selectedPoint.point < 0 ? '#FCA5A5' : '#86EFAC'}`,
               color: selectedPoint.point < 0 ? '#EF4444' : '#10B981',
               fontWeight: 900,
@@ -384,22 +393,23 @@ const SeePoints = () => {
               boxShadow: `0 6px 0 ${selectedPoint.point < 0 ? '#FCA5A5' : '#86EFAC'}`
             }}>
               <span>{selectedPoint.point < 0 ? '' : '+'}{selectedPoint.point}</span>
-              <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#6B7280', marginTop: '12px' }}>Poin</span>
+              <span style={{ fontSize: '1.2rem', fontWeight: 800, color: isDark ? '#FED7AA' : '#6B7280', marginTop: '12px' }}>Poin</span>
             </div>
 
             {/* Description Card */}
             <div style={{
-              backgroundColor: '#FFF9F5',
-              border: '2px solid #FFEDD5',
+              backgroundColor: isDark ? '#3D291C' : '#FFF9F5',
+              border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
               borderRadius: '20px',
               padding: '16px 20px',
               display: 'flex',
-              gap: '12px'
+              gap: '12px',
+              transition: 'all 0.3s ease'
             }}>
               <Info size={22} color="#F97316" style={{ flexShrink: 0 }} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#F97316', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Deskripsi</span>
-                <p style={{ margin: 0, fontSize: '0.95rem', color: '#4B5563', fontWeight: 600, lineHeight: 1.4 }}>
+                <p style={{ margin: 0, fontSize: '0.95rem', color: isDark ? '#E5E7EB' : '#4B5563', fontWeight: 600, lineHeight: 1.4 }}>
                   {selectedPoint.desc || 'Tidak ada deskripsi detail.'}
                 </p>
               </div>
@@ -409,12 +419,12 @@ const SeePoints = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
               {/* Creator Info */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ backgroundColor: '#FFEDD5', padding: '8px', borderRadius: '12px', color: '#F97316' }}>
+                <div style={{ backgroundColor: isDark ? '#3D291C' : '#FFEDD5', padding: '8px', borderRadius: '12px', color: '#F97316' }}>
                   <User size={18} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '0.7rem', color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dibuat Oleh</span>
-                  <span style={{ fontSize: '0.95rem', color: '#374151', fontWeight: 750 }}>
+                  <span style={{ fontSize: '0.95rem', color: isDark ? '#E5E7EB' : '#374151', fontWeight: 750 }}>
                     {loadingCreator ? 'Memuat nama...' : creatorName}
                   </span>
                 </div>
@@ -422,12 +432,12 @@ const SeePoints = () => {
 
               {/* Timestamp Info */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ backgroundColor: '#FFEDD5', padding: '8px', borderRadius: '12px', color: '#F97316' }}>
+                <div style={{ backgroundColor: isDark ? '#3D291C' : '#FFEDD5', padding: '8px', borderRadius: '12px', color: '#F97316' }}>
                   <Calendar size={18} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '0.7rem', color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tanggal Dibuat</span>
-                  <span style={{ fontSize: '0.95rem', color: '#374151', fontWeight: 750 }}>
+                  <span style={{ fontSize: '0.95rem', color: isDark ? '#E5E7EB' : '#374151', fontWeight: 750 }}>
                     {formatDate(selectedPoint.timestamp)}
                   </span>
                 </div>
@@ -445,6 +455,7 @@ const SeePoints = () => {
         }
       `}</style>
 
+    </div>
     </div>
   );
 };

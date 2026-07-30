@@ -3,9 +3,12 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, PlusCircle, AlertCircle, Info, Sparkles, BookOpen, Lock } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 
 const CreatePoint = () => {
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -110,14 +113,15 @@ const CreatePoint = () => {
   if (loading) {
     return (
       <div style={{
-        background: '#FFF9F5',
+        background: isDark ? '#1E130C' : '#FFF9F5',
         minHeight: '100vh',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
         color: '#F97316',
         fontWeight: 800,
-        fontFamily: '"Nunito", sans-serif'
+        fontFamily: '"Nunito", sans-serif',
+        transition: 'background-color 0.3s ease'
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '2rem', marginBottom: '12px' }}>⏳</div>
@@ -130,32 +134,30 @@ const CreatePoint = () => {
   if (!isAuthorized) {
     return (
       <div style={{
-        background: '#FFF9F5',
+        background: isDark ? '#1E130C' : '#FFF9F5',
         minHeight: '100vh',
-        padding: '2rem 1.5rem',
+        fontFamily: '"Nunito", "Inter", sans-serif',
+        transition: 'background-color 0.3s ease',
         display: 'flex',
-        flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        fontFamily: '"Nunito", "Inter", sans-serif',
-        maxWidth: '480px',
-        margin: '0 auto',
-        boxShadow: '0 0 20px rgba(0,0,0,0.05)'
+        padding: '2rem 1.5rem'
       }}>
         <div style={{
-          backgroundColor: '#FFFFFF',
+          backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
           borderRadius: '28px',
           padding: '40px 24px',
           border: '2px solid #FCA5A5',
           boxShadow: '0 8px 0 #FCA5A5',
           textAlign: 'center',
-          width: '100%'
+          width: '100%',
+          transition: 'all 0.3s ease'
         }}>
           <div style={{
             width: '80px',
             height: '80px',
             borderRadius: '50%',
-            backgroundColor: '#FEF2F2',
+            backgroundColor: isDark ? '#3C1C1C' : '#FEF2F2',
             color: '#EF4444',
             display: 'flex',
             alignItems: 'center',
@@ -167,10 +169,10 @@ const CreatePoint = () => {
             <Lock size={36} strokeWidth={2.5} />
           </div>
           
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1F2937', margin: '0 0 12px 0' }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937', margin: '0 0 12px 0' }}>
             Akses Ditolak
           </h1>
-          <p style={{ color: '#6B7280', fontSize: '0.95rem', fontWeight: 600, lineHeight: 1.5, margin: '0 0 32px 0' }}>
+          <p style={{ color: isDark ? '#D1D5DB' : '#6B7280', fontSize: '0.95rem', fontWeight: 600, lineHeight: 1.5, margin: '0 0 32px 0' }}>
             Halaman ini khusus untuk Staff **Kepenghunian** dan **Proteksi**. Jabatan Anda saat ini adalah: **{userRole || 'Umum'}**.
           </p>
 
@@ -212,14 +214,16 @@ const CreatePoint = () => {
 
   return (
     <div style={{
-      background: '#FFF9F5',
+      background: isDark ? '#1E130C' : '#FFF9F5',
       minHeight: '100vh',
-      padding: '2rem 1.5rem 100px 1.5rem',
-      position: 'relative',
       fontFamily: '"Nunito", "Inter", sans-serif',
+      transition: 'background-color 0.3s ease'
+    }}>
+    <div style={{
       maxWidth: '480px',
       margin: '0 auto',
-      boxShadow: '0 0 20px rgba(0,0,0,0.05)'
+      padding: '2rem 1.5rem 100px 1.5rem',
+      position: 'relative',
     }}>
 
       {/* Header Halaman */}
@@ -232,30 +236,30 @@ const CreatePoint = () => {
         <button 
           onClick={() => navigate('/home')}
           style={{
-            background: '#FFFFFF',
-            border: '2px solid #FFEDD5',
+            background: isDark ? '#2D1D13' : '#FFFFFF',
+            border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
             borderRadius: '16px',
             padding: '10px',
             cursor: 'pointer',
             color: '#F97316',
-            boxShadow: '0 4px 0 #FFEDD5',
+            boxShadow: `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'transform 0.1s, box-shadow 0.1s',
+            transition: 'transform 0.1s, box-shadow 0.1s, background-color 0.3s',
             outline: 'none'
           }}
           onMouseDown={(e) => {
             e.currentTarget.style.transform = 'translateY(2px)';
-            e.currentTarget.style.boxShadow = '0 2px 0 #FFEDD5';
+            e.currentTarget.style.boxShadow = `0 2px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`;
           }}
           onMouseUp={(e) => {
             e.currentTarget.style.transform = 'translateY(0px)';
-            e.currentTarget.style.boxShadow = '0 4px 0 #FFEDD5';
+            e.currentTarget.style.boxShadow = `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'translateY(0px)';
-            e.currentTarget.style.boxShadow = '0 4px 0 #FFEDD5';
+            e.currentTarget.style.boxShadow = `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`;
           }}
         >
           <ArrowLeft size={20} strokeWidth={3} />
@@ -269,7 +273,7 @@ const CreatePoint = () => {
           }}>
             Buat Kategori Poin
           </h1>
-          <p style={{ color: '#059669', margin: '0.25rem 0 0 0', fontWeight: 600 }}>
+          <p style={{ color: isDark ? '#86EFAC' : '#059669', margin: '0.25rem 0 0 0', fontWeight: 600 }}>
             Tambahkan aturan poin baru di asrama
           </p>
         </div>
@@ -278,18 +282,19 @@ const CreatePoint = () => {
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {/* Info Box */}
         <div style={{
-          backgroundColor: '#ECFDF5',
-          border: '2px solid #A7F3D0',
+          backgroundColor: isDark ? '#1C3D27' : '#ECFDF5',
+          border: `2px solid ${isDark ? '#065F46' : '#A7F3D0'}`,
           borderRadius: '20px',
           padding: '16px 20px',
           display: 'flex',
           gap: '12px',
-          boxShadow: '0 4px 0 #A7F3D0'
+          boxShadow: `0 4px 0 ${isDark ? '#065F46' : '#A7F3D0'}`,
+          transition: 'all 0.3s ease'
         }}>
           <Sparkles size={22} color="#10B981" style={{ flexShrink: 0, marginTop: '2px' }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Staff Menu</span>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: '#065F46', fontWeight: 600, lineHeight: 1.4 }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: isDark ? '#86EFAC' : '#065F46', fontWeight: 600, lineHeight: 1.4 }}>
               Kategori yang dibuat di sini akan langsung terdaftar di sistem poin dan dapat dipilih saat proses pemberian hukuman (Penghakiman).
             </p>
           </div>
@@ -297,19 +302,20 @@ const CreatePoint = () => {
 
         {/* Input Card Container */}
         <div style={{
-          backgroundColor: '#FFFFFF',
+          backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
           borderRadius: '24px',
           padding: '24px',
-          border: '2px solid #FFEDD5',
-          boxShadow: '0 8px 0 #FFEDD5',
+          border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+          boxShadow: `0 8px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
           display: 'flex',
           flexDirection: 'column',
-          gap: '18px'
+          gap: '18px',
+          transition: 'all 0.3s ease'
         }}>
           
           {/* Nama Poin */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '0.95rem', fontWeight: 800, color: '#374151' }}>
+            <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
               Nama Jenis Poin
             </label>
             <input
@@ -321,21 +327,22 @@ const CreatePoint = () => {
                 width: '100%',
                 padding: '14px',
                 borderRadius: '16px',
-                border: '2px solid #FFEDD5',
+                border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
                 fontSize: '0.95rem',
                 outline: 'none',
                 fontFamily: '"Nunito", "Inter", sans-serif',
-                boxShadow: '0 4px 0 #FFEDD5',
-                backgroundColor: '#FFFFFF',
+                boxShadow: `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
                 fontWeight: 650,
-                color: '#1F2937'
+                color: isDark ? '#E5E7EB' : '#1F2937',
+                transition: 'all 0.3s ease'
               }}
             />
           </div>
 
           {/* Tipe Poin Dropdown */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '0.95rem', fontWeight: 800, color: '#374151' }}>
+            <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
               Tipe Kategori
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -345,13 +352,13 @@ const CreatePoint = () => {
                 style={{
                   padding: '12px',
                   borderRadius: '16px',
-                  border: type === 'pengurangan' ? '3px solid #EF4444' : '2px solid #FFEDD5',
-                  backgroundColor: type === 'pengurangan' ? '#FEF2F2' : '#FFFFFF',
-                  color: type === 'pengurangan' ? '#EF4444' : '#6B7280',
+                  border: type === 'pengurangan' ? '3px solid #EF4444' : `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                  backgroundColor: type === 'pengurangan' ? (isDark ? '#3C1C1C' : '#FEF2F2') : (isDark ? '#1E130C' : '#FFFFFF'),
+                  color: type === 'pengurangan' ? '#EF4444' : (isDark ? '#9CA3AF' : '#6B7280'),
                   fontWeight: 800,
                   fontSize: '0.9rem',
                   cursor: 'pointer',
-                  boxShadow: type === 'pengurangan' ? '0 4px 0 #FCA5A5' : '0 4px 0 #FFEDD5',
+                  boxShadow: type === 'pengurangan' ? `0 4px 0 ${isDark ? '#7F1D1D' : '#FCA5A5'}` : `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
                   transition: 'transform 0.1s, box-shadow 0.1s',
                   outline: 'none'
                 }}
@@ -364,13 +371,13 @@ const CreatePoint = () => {
                 style={{
                   padding: '12px',
                   borderRadius: '16px',
-                  border: type === 'penambahan' ? '3px solid #10B981' : '2px solid #FFEDD5',
-                  backgroundColor: type === 'penambahan' ? '#F0FDF4' : '#FFFFFF',
-                  color: type === 'penambahan' ? '#10B981' : '#6B7280',
+                  border: type === 'penambahan' ? '3px solid #10B981' : `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                  backgroundColor: type === 'penambahan' ? (isDark ? '#1C3D27' : '#F0FDF4') : (isDark ? '#1E130C' : '#FFFFFF'),
+                  color: type === 'penambahan' ? '#10B981' : (isDark ? '#9CA3AF' : '#6B7280'),
                   fontWeight: 800,
                   fontSize: '0.9rem',
                   cursor: 'pointer',
-                  boxShadow: type === 'penambahan' ? '0 4px 0 #86EFAC' : '0 4px 0 #FFEDD5',
+                  boxShadow: type === 'penambahan' ? `0 4px 0 ${isDark ? '#065F46' : '#86EFAC'}` : `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
                   transition: 'transform 0.1s, box-shadow 0.1s',
                   outline: 'none'
                 }}
@@ -382,7 +389,7 @@ const CreatePoint = () => {
 
           {/* Nilai Poin */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '0.95rem', fontWeight: 800, color: '#374151' }}>
+            <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
               Besaran Poin (Angka Positif)
             </label>
             <div style={{ position: 'relative' }}>
@@ -408,14 +415,15 @@ const CreatePoint = () => {
                   width: '100%',
                   padding: '14px 14px 14px 36px',
                   borderRadius: '16px',
-                  border: '2px solid #FFEDD5',
+                  border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
                   fontSize: '1.1rem',
                   outline: 'none',
                   fontFamily: '"Nunito", "Inter", sans-serif',
-                  boxShadow: '0 4px 0 #FFEDD5',
-                  backgroundColor: '#FFFFFF',
+                  boxShadow: `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                  backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
                   fontWeight: 800,
-                  color: type === 'pengurangan' ? '#EF4444' : '#10B981'
+                  color: type === 'pengurangan' ? '#EF4444' : '#10B981',
+                  transition: 'all 0.3s ease'
                 }}
               />
             </div>
@@ -426,7 +434,7 @@ const CreatePoint = () => {
 
           {/* Deskripsi */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '0.95rem', fontWeight: 800, color: '#374151' }}>
+            <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
               Deskripsi Detail
             </label>
             <textarea
@@ -438,16 +446,17 @@ const CreatePoint = () => {
                 width: '100%',
                 padding: '14px',
                 borderRadius: '16px',
-                border: '2px solid #FFEDD5',
+                border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
                 fontSize: '0.95rem',
                 outline: 'none',
                 fontFamily: '"Nunito", "Inter", sans-serif',
-                boxShadow: '0 4px 0 #FFEDD5',
-                backgroundColor: '#FFFFFF',
+                boxShadow: `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
                 fontWeight: 650,
-                color: '#1F2937',
+                color: isDark ? '#E5E7EB' : '#1F2937',
                 resize: 'none',
-                lineHeight: 1.4
+                lineHeight: 1.4,
+                transition: 'all 0.3s ease'
               }}
             />
           </div>
@@ -501,6 +510,7 @@ const CreatePoint = () => {
         </button>
       </form>
 
+    </div>
     </div>
   );
 };

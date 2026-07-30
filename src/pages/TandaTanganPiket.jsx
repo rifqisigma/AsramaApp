@@ -1,17 +1,50 @@
 import { useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { collection, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
-import { ArrowLeft, CheckCircle, Clock, MapPin, User, FileImage, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ArrowLeft, CheckCircle, Clock, MapPin, User, FileImage, X, XCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { logToGoogleSheets, formatVerificationData } from '../context/sheetsService';
+import { useTheme } from '../context/ThemeContext';
 
 const TandaTanganPiket = () => {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [previewMedia, setPreviewMedia] = useState(null); // { url, type }
+  const [isAllowed, setIsAllowed] = useState(null);
+  const navigate = useNavigate();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   useEffect(() => {
-    fetchReports();
-  }, []);
+    const checkAccess = async () => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        navigate('/login');
+        return;
+      }
+      try {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userDocRef);
+        if (userSnap.exists()) {
+          const uData = userSnap.data();
+          if (uData.jabatan && uData.jabatan.trim() !== '') {
+            setIsAllowed(true);
+            fetchReports();
+          } else {
+            alert('Akses ditolak. Hanya pengguna yang memiliki jabatan yang dapat mengakses halaman tanda tangan piket.');
+            navigate('/home');
+          }
+        } else {
+          alert('Akses ditolak. Data pengguna tidak ditemukan.');
+          navigate('/home');
+        }
+      } catch (err) {
+        console.error('Error checking access:', err);
+        navigate('/home');
+      }
+    };
+    checkAccess();
+  }, [navigate]);
 
   const fetchReports = async () => {
     if (!auth.currentUser) return;
@@ -64,9 +97,24 @@ const TandaTanganPiket = () => {
     if (!window.confirm("Yakin ingin memverifikasi laporan piket ini?")) return;
 
     try {
+      const report = reports.find(r => r.id === reportId);
+      
+      // Update Firebase
       await updateDoc(doc(db, 'piket', reportId), {
         verification: true
       });
+
+      // Log ke Google Sheets (async, non-blocking)
+      if (auth.currentUser) {
+        const formattedData = formatVerificationData('piket', report);
+        logToGoogleSheets({
+          type: 'piket',
+          verificationData: formattedData,
+          verifierName: auth.currentUser.displayName || auth.currentUser.email || 'Unknown',
+          verifierId: auth.currentUser.uid
+        }).catch(err => console.warn('Sheets logging error:', err));
+      }
+
       // Hapus dari daftar
       setReports(prev => prev.filter(r => r.id !== reportId));
       alert("Berhasil diverifikasi!");
@@ -108,80 +156,106 @@ const TandaTanganPiket = () => {
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays > 6) {
-      return <div style={{ padding: '6px 10px', borderRadius: '12px', backgroundColor: '#FEE2E2', color: '#DC2626', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>Kamu terlalu<br />lama ttd</div>;
+      return <div style={{ padding: '6px 10px', borderRadius: '12px', backgroundColor: isDark ? '#4C1A1A' : '#FEE2E2', color: '#DC2626', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>Kamu terlalu<br />lama ttd</div>;
     } else if (diffDays > 3) {
-      return <div style={{ padding: '6px 10px', borderRadius: '12px', backgroundColor: '#FEF3C7', color: '#D97706', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>Jangan lama<br />lama</div>;
+      return <div style={{ padding: '6px 10px', borderRadius: '12px', backgroundColor: isDark ? '#3D2A00' : '#FEF3C7', color: '#D97706', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>Jangan lama<br />lama</div>;
     } else {
-      return <div style={{ padding: '6px 10px', borderRadius: '12px', backgroundColor: '#D1FAE5', color: '#059669', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>Segera ttd<br />yaa</div>;
+      return <div style={{ padding: '6px 10px', borderRadius: '12px', backgroundColor: isDark ? '#0D2D1E' : '#D1FAE5', color: '#059669', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>Segera ttd<br />yaa</div>;
     }
   };
+
+  if (isAllowed === null) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: isDark ? '#1E130C' : '#F3F4F6',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        fontFamily: '"Nunito", "Inter", sans-serif',
+        color: '#3B82F6',
+        fontWeight: 800,
+        fontSize: '1.2rem',
+        transition: 'background-color 0.3s ease'
+      }}>
+        Memeriksa Hak Akses...
+      </div>
+    );
+  }
 
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: '#F3F4F6',
+      backgroundColor: isDark ? '#1E130C' : '#F3F4F6',
       fontFamily: '"Nunito", "Inter", sans-serif',
-      padding: '24px 16px 80px 16px'
+      padding: '24px 16px 80px 16px',
+      transition: 'background-color 0.3s ease'
     }}>
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         <Link to="/home" style={{
           display: 'inline-flex',
           alignItems: 'center',
           gap: '8px',
-          color: '#4B5563',
+          color: isDark ? '#F97316' : '#4B5563',
           textDecoration: 'none',
           fontWeight: 700,
           marginBottom: '24px',
-          backgroundColor: 'white',
+          backgroundColor: isDark ? '#2D1D13' : 'white',
+          border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
           padding: '8px 16px',
           borderRadius: '20px',
-          boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
+          boxShadow: isDark ? '0 2px 5px rgba(0,0,0,0.3)' : '0 2px 5px rgba(0,0,0,0.05)',
+          transition: 'all 0.3s ease'
         }}>
           <ArrowLeft size={18} />
           Kembali
         </Link>
 
         <div style={{
-          backgroundColor: '#FFFFFF',
+          backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
           borderRadius: '16px',
           padding: '32px 24px',
+          border: `2px solid ${isDark ? '#4A2E1E' : '#DBEAFE'}`,
           borderTop: '10px solid #3B82F6',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
-          marginBottom: '16px'
+          boxShadow: isDark ? '0 4px 6px rgba(0,0,0,0.4)' : '0 4px 6px rgba(0, 0, 0, 0.05)',
+          marginBottom: '16px',
+          transition: 'all 0.3s ease'
         }}>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1C1C1E', margin: '0 0 12px 0' }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: isDark ? '#FFFFFF' : '#1C1C1E', margin: '0 0 12px 0' }}>
             Tanda Tangan Piket
           </h1>
-          <p style={{ color: '#6B7280', margin: 0, fontSize: '1rem', fontWeight: 600 }}>
+          <p style={{ color: isDark ? '#93C5FD' : '#6B7280', margin: 0, fontSize: '1rem', fontWeight: 600 }}>
             Daftar laporan piket yang menunggu verifikasi dari Anda.
           </p>
         </div>
 
         {loading ? (
-          <p style={{ textAlign: 'center', color: '#6B7280', fontWeight: 700, marginTop: '40px' }}>Memuat laporan...</p>
+          <p style={{ textAlign: 'center', color: isDark ? '#93C5FD' : '#6B7280', fontWeight: 700, marginTop: '40px' }}>Memuat laporan...</p>
         ) : reports.length === 0 ? (
-          <div style={{ textAlign: 'center', backgroundColor: 'white', padding: '40px 20px', borderRadius: '16px' }}>
+          <div style={{ textAlign: 'center', backgroundColor: isDark ? '#2D1D13' : 'white', padding: '40px 20px', borderRadius: '16px', border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}` }}>
             <CheckCircle size={48} color="#10B981" style={{ marginBottom: '16px' }} />
-            <h3 style={{ margin: '0 0 8px 0', color: '#1F2937' }}>Semua Sudah Beres!</h3>
-            <p style={{ margin: 0, color: '#6B7280' }}>Tidak ada laporan piket yang perlu diverifikasi saat ini.</p>
+            <h3 style={{ margin: '0 0 8px 0', color: isDark ? '#FFFFFF' : '#1F2937' }}>Semua Sudah Beres!</h3>
+            <p style={{ margin: 0, color: isDark ? '#9CA3AF' : '#6B7280' }}>Tidak ada laporan piket yang perlu diverifikasi saat ini.</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {reports.map((report) => (
               <div key={report.id} style={{
-                backgroundColor: 'white',
+                backgroundColor: isDark ? '#2D1D13' : 'white',
                 borderRadius: '16px',
                 padding: '20px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.05)'
+                boxShadow: isDark ? '0 4px 6px rgba(0,0,0,0.4)' : '0 4px 6px rgba(0,0,0,0.05)',
+                border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+                transition: 'all 0.3s ease'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid #F3F4F6' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '16px', borderBottom: `1px solid ${isDark ? '#4A2E1E' : '#F3F4F6'}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: '#EFF6FF', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#3B82F6', fontWeight: 800, fontSize: '1.2rem' }}>
+                    <div style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: isDark ? '#1C2E4A' : '#EFF6FF', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#3B82F6', fontWeight: 800, fontSize: '1.2rem' }}>
                       {report.pelaporName.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: '#1F2937' }}>{report.pelaporName}</h3>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#6B7280', fontWeight: 700 }}>
+                      <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: isDark ? '#FFFFFF' : '#1F2937' }}>{report.pelaporName}</h3>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: isDark ? '#9CA3AF' : '#6B7280', fontWeight: 700 }}>
                         <User size={14} /> Angkatan {report.pelaporAngkatan}
                       </div>
                     </div>
@@ -190,11 +264,11 @@ const TandaTanganPiket = () => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4B5563', fontSize: '0.9rem', fontWeight: 600 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isDark ? '#FED7AA' : '#4B5563', fontSize: '0.9rem', fontWeight: 600 }}>
                     <MapPin size={16} color="#F97316" />
                     Tempat: {report.place}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4B5563', fontSize: '0.9rem', fontWeight: 600 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isDark ? '#93C5FD' : '#4B5563', fontSize: '0.9rem', fontWeight: 600 }}>
                     <Clock size={16} color="#3B82F6" />
                     Waktu: {formatTimestamp(report.timestamp)}
                   </div>
@@ -203,7 +277,7 @@ const TandaTanganPiket = () => {
                 {/* Bukti Links */}
                 {report.buktiLink && report.buktiLink.length > 0 && (
                   <div style={{ marginBottom: '20px' }}>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 700, color: '#374151' }}>Bukti Laporan:</p>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '0.9rem', fontWeight: 700, color: isDark ? '#E5E7EB' : '#374151' }}>Bukti Laporan:</p>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {report.buktiLink.map((url, i) => (
                         <div
@@ -212,14 +286,14 @@ const TandaTanganPiket = () => {
                           style={{
                             width: '70px',
                             height: '70px',
-                            backgroundColor: '#F3F4F6',
+                            backgroundColor: isDark ? '#1E130C' : '#F3F4F6',
                             borderRadius: '12px',
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'center',
                             alignItems: 'center',
                             cursor: 'pointer',
-                            border: '1px solid #E5E7EB',
+                            border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
                             overflow: 'hidden'
                           }}
                         >
@@ -236,31 +310,58 @@ const TandaTanganPiket = () => {
                   </div>
                 )}
 
-                <button
-                  onClick={() => handleVerify(report.id)}
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    backgroundColor: '#10B981',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontSize: '1rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    gap: '8px',
-                    transition: 'transform 0.1s'
-                  }}
-                  onMouseDown={(e) => e.target.style.transform = 'scale(0.98)'}
-                  onMouseUp={(e) => e.target.style.transform = 'scale(1)'}
-                  onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-                >
-                  <CheckCircle size={20} /> Verifikasi Sekarang
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <button
+                    onClick={() => handleVerify(report.id)}
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      backgroundColor: '#10B981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'transform 0.1s'
+                    }}
+                    onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
+                    onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    <CheckCircle size={20} /> Verifikasi Sekarang
+                  </button>
+                  <button
+                    onClick={() => navigate('/catatan-piket', { state: { reportId: report.id, reportDate: report.timestamp?.toDate ? report.timestamp.toDate().toISOString() : new Date().toISOString() } })}
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      backgroundColor: '#EF4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'transform 0.1s'
+                    }}
+                    onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
+                    onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    <XCircle size={20} /> Tidak Mau Verifikasi
+                  </button>
+                </div>
 
               </div>
             ))}
