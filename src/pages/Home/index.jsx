@@ -12,6 +12,7 @@ import CardPiket from '../../components/CardPiket';
 import CardJamal from '../../components/CardJamal';
 import CardCreatePiket from '../../components/CardCreatePiket';
 import CardAbsenMalam from '../../components/CardAbsenMalam';
+import CardBerita from '../../components/CardBerita';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -369,6 +370,9 @@ const Home = () => {
 
         {/* 6. COMPONENT: Card Absen Malam */}
         <CardAbsenMalam userData={userData} theme={theme} navigate={navigate} />
+
+        {/* 7. COMPONENT: Card Berita (hanya untuk user dengan jabatan) */}
+        <CardBerita userData={userData} theme={theme} navigate={navigate} />
 
       </div>
 

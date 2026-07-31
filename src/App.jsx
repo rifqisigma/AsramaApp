@@ -21,6 +21,7 @@ import HistoryActivity from './pages/HistoryActivity';
 import FormAbsenMalam from './pages/FormAbsenMalam';
 import VerificationAbsenMalam from './pages/VerificationAbsenMalam';
 import CatatanPiket from './pages/CatatanPiket';
+import CreateBerita from './pages/CreateBerita';
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -109,6 +110,7 @@ function App() {
             <Route path="/form-absen-malam" element={user ? <FormAbsenMalam /> : <Navigate to="/login" />} />
             <Route path="/verification-absen-malam" element={user ? <VerificationAbsenMalam /> : <Navigate to="/login" />} />
             <Route path="/catatan-piket" element={user ? <CatatanPiket /> : <Navigate to="/login" />} />
+            <Route path="/create-berita" element={user ? <CreateBerita /> : <Navigate to="/login" />} />
             <Route path="/" element={<Navigate to={user ? "/home" : "/login"} />} />
           </Routes>
         </Router>

@@ -55,16 +55,56 @@ const CardPoint = ({ userData, theme }) => {
       </div>
 
       {/* Point value */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-        <span style={{
-          fontSize: '2.5rem',
-          fontWeight: 900,
-          color: (userData?.point ?? 0) >= 0 ? '#10B981' : '#EF4444',
-          fontFamily: '"Nunito", "Inter", sans-serif'
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {/* Angka poin + label */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+          <span style={{
+            fontSize: '2.5rem',
+            fontWeight: 900,
+            color: getPointColor(userData?.point ?? 0),
+            fontFamily: '"Nunito", "Inter", sans-serif',
+            transition: 'color 0.3s'
+          }}>
+            {userData?.point ?? 0}
+          </span>
+          <span style={{ fontSize: '1.1rem', fontWeight: 800, color: labelColor }}>/ 110 Poin</span>
+        </div>
+
+        {/* Badge kategori */}
+        <div style={{
+          alignSelf: 'flex-start',
+          backgroundColor: getPointBadgeBg(userData?.point ?? 0, isDark),
+          border: `2px solid ${getPointColor(userData?.point ?? 0)}`,
+          borderRadius: '20px',
+          padding: '4px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          boxShadow: `0 3px 0 ${getPointColor(userData?.point ?? 0)}33`
         }}>
-          {userData?.point ?? 0}
-        </span>
-        <span style={{ fontSize: '1.1rem', fontWeight: 800, color: labelColor }}>Poin</span>
+          <span style={{ fontSize: '0.85rem' }}>{getPointEmoji(userData?.point ?? 0)}</span>
+          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: getPointColor(userData?.point ?? 0) }}>
+            {getPointLabel(userData?.point ?? 0)}
+          </span>
+        </div>
+
+        {/* Progress Bar */}
+        <div style={{
+          width: '100%',
+          height: '12px',
+          backgroundColor: isDark ? '#1E130C' : '#F3F4F6',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`
+        }}>
+          <div style={{
+            height: '100%',
+            width: `${Math.min(100, Math.max(0, ((userData?.point ?? 0) / 110) * 100))}%`,
+            backgroundColor: getPointColor(userData?.point ?? 0),
+            borderRadius: '8px',
+            transition: 'width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }} />
+        </div>
       </div>
 
       {/* Action buttons */}
@@ -160,6 +200,34 @@ const CardPoint = ({ userData, theme }) => {
       </div>
     </div>
   );
+};
+
+// ─── Helper: warna berdasarkan range poin ─────────────────────────────────
+// Hijau : 100 – 110
+// Oranye: 75  – 99
+// Merah : 0   – 74
+const getPointColor = (point) => {
+  if (point >= 100) return '#10B981'; // hijau
+  if (point >= 75)  return '#F97316'; // oranye
+  return '#EF4444';                   // merah
+};
+
+const getPointLabel = (point) => {
+  if (point >= 100) return 'Poin Aman 🟢';
+  if (point >= 75)  return 'Perlu Perhatian 🟡';
+  return 'Kritis! 🔴';
+};
+
+const getPointEmoji = (point) => {
+  if (point >= 100) return '✅';
+  if (point >= 75)  return '⚠️';
+  return '🚨';
+};
+
+const getPointBadgeBg = (point, isDark) => {
+  if (point >= 100) return isDark ? '#0D2E22' : '#ECFDF5';
+  if (point >= 75)  return isDark ? '#3D1F0A' : '#FFF7ED';
+  return isDark ? '#2C0F0F' : '#FEF2F2';
 };
 
 export default CardPoint;

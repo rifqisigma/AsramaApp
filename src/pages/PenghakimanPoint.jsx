@@ -164,9 +164,10 @@ const PenghakimanPoint = () => {
       const batch = writeBatch(db);
 
       for (const u of selectedUsers) {
-        // Calculate new point score
+        // Calculate new point score — clamp antara 0 (min) dan 110 (max)
         const currentPoint = u.point ?? 0;
-        const newPoint = currentPoint + totalDelta;
+        const rawPoint = currentPoint + totalDelta;
+        const newPoint = Math.min(110, Math.max(0, rawPoint));
 
         // 1. Update users point in database
         const userDocRef = doc(db, 'users', u.id);
