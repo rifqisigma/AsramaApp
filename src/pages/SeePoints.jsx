@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Calendar, User, Info, X } from 'lucide-react';
+import { ArrowLeft, Search, Calendar, User, Info, X, Target, Shield } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 const SeePoints = () => {
@@ -429,6 +429,36 @@ const SeePoints = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Target - hanya untuk tipe pengurangan */}
+              {selectedPoint.type === 'pengurangan' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ backgroundColor: isDark ? '#3C1C1C' : '#FEE2E2', padding: '8px', borderRadius: '12px', color: '#EF4444' }}>
+                    <Target size={18} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Target</span>
+                    <span style={{ fontSize: '0.95rem', color: isDark ? '#E5E7EB' : '#374151', fontWeight: 750 }}>
+                      {selectedPoint.target || '-'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* PIC - hanya untuk tipe penambahan */}
+              {selectedPoint.type === 'penambahan' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ backgroundColor: isDark ? '#1C3D27' : '#E6F4EA', padding: '8px', borderRadius: '12px', color: '#10B981' }}>
+                    <Shield size={18} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>PIC</span>
+                    <span style={{ fontSize: '0.95rem', color: isDark ? '#E5E7EB' : '#374151', fontWeight: 750 }}>
+                      {selectedPoint.pic || '-'}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Timestamp Info */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

@@ -19,6 +19,8 @@ const CreatePoint = () => {
   const [desc, setDesc] = useState('');
   const [type, setType] = useState('pengurangan'); // pengurangan or penambahan
   const [pointValue, setPointValue] = useState('');
+  const [target, setTarget] = useState(''); // untuk tipe pengurangan
+  const [pic, setPic] = useState(''); // untuk tipe penambahan
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -74,6 +76,14 @@ const CreatePoint = () => {
       alert("Harap masukkan nilai poin yang valid (angka).");
       return;
     }
+    if (type === 'pengurangan' && !target.trim()) {
+      alert("Harap masukkan Target untuk poin pengurangan.");
+      return;
+    }
+    if (type === 'penambahan' && !pic.trim()) {
+      alert("Harap masukkan PIC untuk poin penambahan.");
+      return;
+    }
 
     const numericPoint = Math.abs(parseInt(pointValue));
     if (numericPoint === 0) {
@@ -95,7 +105,9 @@ const CreatePoint = () => {
         point: finalPointValue,
         type: type,
         timestamp: new Date().toISOString(),
-        whoCreate: doc(db, 'users', userUid)
+        whoCreate: doc(db, 'users', userUid),
+        ...(type === 'pengurangan' ? { target: target.trim() } : {}),
+        ...(type === 'penambahan' ? { pic: pic.trim() } : {}),
       };
 
       await addDoc(collection(db, 'systemPoint'), pointData);
@@ -431,6 +443,70 @@ const CreatePoint = () => {
               Masukkan nilai positif. Tanda minus (-) akan disematkan secara otomatis jika memilih tipe Pengurangan.
             </p>
           </div>
+
+          {/* Target - hanya tampil saat tipe pengurangan */}
+          {type === 'pengurangan' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
+                🎯 Target
+              </label>
+              <input
+                type="text"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                placeholder="Contoh: Semua Penghuni, Kamar A, Ketua Kamar..."
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '16px',
+                  border: `2px solid ${isDark ? '#7F1D1D' : '#FCA5A5'}`,
+                  fontSize: '0.95rem',
+                  outline: 'none',
+                  fontFamily: '"Nunito", "Inter", sans-serif',
+                  boxShadow: `0 4px 0 ${isDark ? '#7F1D1D' : '#FCA5A5'}`,
+                  backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
+                  fontWeight: 650,
+                  color: isDark ? '#E5E7EB' : '#1F2937',
+                  transition: 'all 0.3s ease'
+                }}
+              />
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#9CA3AF', fontWeight: 600 }}>
+                Siapa yang menjadi target pengurangan poin ini?
+              </p>
+            </div>
+          )}
+
+          {/* PIC - hanya tampil saat tipe penambahan */}
+          {type === 'penambahan' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
+                👤 PIC (Penanggung Jawab)
+              </label>
+              <input
+                type="text"
+                value={pic}
+                onChange={(e) => setPic(e.target.value)}
+                placeholder="Contoh: Pembina Asrama, Staff Kepenghunian..."
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '16px',
+                  border: `2px solid ${isDark ? '#065F46' : '#86EFAC'}`,
+                  fontSize: '0.95rem',
+                  outline: 'none',
+                  fontFamily: '"Nunito", "Inter", sans-serif',
+                  boxShadow: `0 4px 0 ${isDark ? '#065F46' : '#86EFAC'}`,
+                  backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
+                  fontWeight: 650,
+                  color: isDark ? '#E5E7EB' : '#1F2937',
+                  transition: 'all 0.3s ease'
+                }}
+              />
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#9CA3AF', fontWeight: 600 }}>
+                Siapa yang bertanggung jawab atas penambahan poin ini?
+              </p>
+            </div>
+          )}
 
           {/* Deskripsi */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

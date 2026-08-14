@@ -4,6 +4,7 @@ import { auth, db } from '../../firebase';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { Home as HomeIcon, Brush, User, Moon } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { requestNotificationPermission } from '../../context/fcmService';
 
 // Import newly modularized components
 import CardPoint from '../../components/CardPoint';
@@ -159,6 +160,28 @@ const Home = () => {
       }
     };
     fetchUserData();
+  }, []);
+
+  // Request izin notifikasi otomatis saat pertama kali buka Home
+  useEffect(() => {
+    const askNotifPermission = async () => {
+      try {
+        // Hanya minta jika belum pernah diputuskan user (default = belum pernah muncul)
+        if (Notification.permission === 'default') {
+          // Tunggu sebentar agar UI Home sudah render dulu
+          setTimeout(async () => {
+            await requestNotificationPermission();
+          }, 2000);
+        } else if (Notification.permission === 'granted') {
+          // Kalau sudah izin tapi belum ada token (misal login ulang), generate token
+          const { getFCMToken } = await import('../../context/fcmService');
+          await getFCMToken();
+        }
+      } catch (error) {
+        console.error('Error requesting notification permission:', error);
+      }
+    };
+    askNotifPermission();
   }, []);
 
   // Fetch Kegiatan and Resolve Author Jabatan

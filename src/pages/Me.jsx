@@ -33,12 +33,16 @@ const Me = () => {
       // Mock data untuk fallback jika user belum login atau data belum ada
       const mockData = {
         angkatan: 62,
+        angkatanAis: '62/73',
         createdAt: { toDate: () => new Date('2026-04-30T14:10:32Z') },
         email: "rifqiadlihernawan@gmail.com",
+        emailPersonal: "rifqi.personal@gmail.com",
         fotoProfil: "https://i.pinimg.com/736x/48/e1/40/48e140ba1a52fecc6ca87be41cfd0521.jpg",
         jabatan: "kepenghunian",
         nim: "j0404251076",
         prodi: "tek",
+        prodiNama: "Teknik Komputer dan Sains Data",
+        statusPenghuni: "AKTIF",
         username: "rifqi",
         point: 75
       };
@@ -167,7 +171,7 @@ const Me = () => {
           {/* Bagian Atas: Avatar & Nama */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             <img
-              src={userData.fotoProfil || "https://via.placeholder.com/150"}
+              src={userData.fotoProfil || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username || 'User')}&background=F97316&color=fff&size=150&bold=true`}
               alt="Profile"
               style={{
                 width: '80px',
@@ -188,6 +192,14 @@ const Me = () => {
                   {userData.email}
                 </span>
               </div>
+              {userData.emailPersonal && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: isDark ? '#9CA3AF' : '#9CA3AF', marginTop: '2px', fontSize: '0.8rem', fontWeight: 600 }}>
+                  <Mail size={14} style={{ flexShrink: 0 }} />
+                  <span style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                    {userData.emailPersonal}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -215,18 +227,27 @@ const Me = () => {
                 <div style={{ backgroundColor: isDark ? '#3D291C' : '#FFEDD5', padding: '6px', borderRadius: '12px', color: '#F97316', flexShrink: 0 }}>
                   <User size={18} />
                 </div>
-                <span style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{userData.angkatan}</span>
+                <span style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                  {userData.angkatanAis || userData.angkatan}
+                </span>
               </div>
             </div>
 
-            {/* Prodi */}
+            {/* Prodi (Kode) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
               <span style={{ fontSize: '0.75rem', color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prodi</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151', fontSize: '0.95rem', minWidth: 0 }}>
                 <div style={{ backgroundColor: isDark ? '#3D291C' : '#FFEDD5', padding: '6px', borderRadius: '12px', color: '#F97316', flexShrink: 0 }}>
                   <Book size={18} />
                 </div>
-                <span style={{ textTransform: 'uppercase', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{userData.prodi}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span style={{ textTransform: 'uppercase', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{userData.prodi}</span>
+                  {userData.prodiNama && (
+                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: isDark ? '#9CA3AF' : '#6B7280', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                      {userData.prodiNama}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -240,6 +261,33 @@ const Me = () => {
                 <span style={{ textTransform: 'capitalize', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title={userData.jabatan}>{userData.jabatan}</span>
               </div>
             </div>
+
+            {/* Status Penghuni */}
+            {userData.statusPenghuni && (
+              <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontSize: '0.75rem', color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status Penghuni</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 14px',
+                    borderRadius: '12px',
+                    fontWeight: 800,
+                    fontSize: '0.9rem',
+                    backgroundColor: userData.statusPenghuni === 'AKTIF'
+                      ? (isDark ? '#1C3D27' : '#DCFCE7')
+                      : (isDark ? '#3C1C1C' : '#FEE2E2'),
+                    color: userData.statusPenghuni === 'AKTIF' ? '#16A34A' : '#EF4444',
+                    border: `2px solid ${userData.statusPenghuni === 'AKTIF' ? '#86EFAC' : '#FCA5A5'}`,
+                    boxShadow: `0 3px 0 ${userData.statusPenghuni === 'AKTIF' ? '#86EFAC' : '#FCA5A5'}`
+                  }}>
+                    <span>{userData.statusPenghuni === 'AKTIF' ? '✅' : '❌'}</span>
+                    <span>{userData.statusPenghuni}</span>
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Poin Asrama */}
             <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
