@@ -130,6 +130,30 @@ exports.onPiketVerified = onDocumentUpdated("piket/{piketId}", async (event) => 
 });
 
 /**
+ * Trigger: When catatan piket is created (piket rejected)
+ * Send notification to the reporter (userPiket)
+ */
+exports.onCatatanPiketCreated = onDocumentCreated("catatanPiket/{catatanId}", async (event) => {
+  const data = event.data.data();
+  if (!data || !data.userPiket) return;
+
+  const reporterId = typeof data.userPiket === 'string'
+    ? data.userPiket
+    : (data.userPiket.id || data.userPiket.path?.split('/').pop());
+
+  if (!reporterId) return;
+
+  const title = "Laporan Piket Ditolak";
+  const body = `Alasan: ${data.catatan || "Tidak ada alasan."}`;
+
+  await sendNotification(reporterId, title, body, {
+    link: "/history",
+    type: "piket_rejected",
+    catatanId: event.params.catatanId,
+  });
+});
+
+/**
  * Trigger: When jamal report is verified
  * Send notification to all members on duty (usertoJamal array)
  */

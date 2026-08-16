@@ -350,7 +350,7 @@ const Home = () => {
             onMouseLeave={e => e.currentTarget.style.transform = 'scale(1) rotate(0deg)'}
           >
             <img
-              src={userData.fotoProfil || "https://via.placeholder.com/150"}
+              src={userData.fotoProfil || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username || 'User')}&background=F97316&color=fff&size=150&bold=true`}
               alt="Profile"
               style={{
                 width: '64px',

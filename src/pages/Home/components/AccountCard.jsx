@@ -15,11 +15,11 @@ const AccountCard = ({ userData }) => {
         </p>
       </div>
       <div style={{ width: 50, height: 50, borderRadius: '50%', backgroundColor: '#E0E0E0', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-        {fotoProfil ? (
-          <img src={fotoProfil} alt="Profil" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <User size={24} color="var(--text-muted)" />
-        )}
+        <img 
+          src={fotoProfil || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=F97316&color=fff&size=150&bold=true`} 
+          alt="Profil" 
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+        />
       </div>
     </div>
   );

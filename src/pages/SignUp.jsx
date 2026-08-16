@@ -151,8 +151,6 @@ const SignUp = () => {
       }
 
       // Buat doc Firestore dengan UID yang diberikan
-      const defaultFotoProfil = 'https://firebasestorage.googleapis.com/v0/b/asrama-ipb-sukasari.firebasestorage.app/o/AsramaApp%2FphotoProfil%2Fpp_app.jpeg?alt=media&token=9948e9e5-ad8f-46d9-b881-c44b9be5e0c9';
-
       const firestoreWritePromise = setDoc(userDocRef, {
         username: username.trim(),
         email: email.trim(),
@@ -160,7 +158,7 @@ const SignUp = () => {
         angkatan: parseInt(angkatan) || 62,
         nim: nim.trim(),
         jabatan: jabatan.trim() || 'penghuni',
-        fotoProfil: fotoProfil.trim() || defaultFotoProfil,
+        fotoProfil: fotoProfil.trim() || '',
         point: 110,
         createdAt: new Date()
       });
@@ -177,7 +175,7 @@ const SignUp = () => {
       setUsername(''); setEmail(''); setUid('');
       setProdi(''); setAngkatan(''); setNim('');
       setJabatan('');
-      setFotoProfil(defaultFotoProfil);
+      setFotoProfil('');
     } catch (err) {
       console.error("Terjadi error saat sinkronisasi:", err);
       setError('Gagal sinkronisasi: ' + err.message);

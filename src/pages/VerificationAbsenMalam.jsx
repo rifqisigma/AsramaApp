@@ -439,7 +439,7 @@ const VerificationAbsenMalam = () => {
                 {/* Info Profil & Jam Kirim */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyBetween: 'space-between', gap: '12px' }}>
                   <img
-                    src={userDetails.fotoProfil}
+                    src={userDetails.fotoProfil || `https://ui-avatars.com/api/?name=${encodeURIComponent(userDetails.username || 'User')}&background=F97316&color=fff&size=150&bold=true`}
                     alt={userDetails.username}
                     style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #F97316' }}
                   />

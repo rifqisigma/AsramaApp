@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
-import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
 import { ArrowLeft, Send } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
@@ -46,14 +46,32 @@ const CatatanPiket = () => {
       const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
       const username = userSnap.exists() ? (userSnap.data().username || currentUser.email) : currentUser.email;
 
-      // Simpan catatan ke Firestore (sub-collection atau collection terpisah)
+      // Ambil data piket untuk mendapatkan userPiket
+      const piketRef = doc(db, 'piket', reportId);
+      const piketSnap = await getDoc(piketRef);
+      
+      let userPiketId = null;
+      if (piketSnap.exists()) {
+        const piketData = piketSnap.data();
+        if (piketData.userPiket) {
+          userPiketId = typeof piketData.userPiket === 'string'
+            ? piketData.userPiket
+            : (piketData.userPiket.id || piketData.userPiket.path?.split('/').pop());
+        }
+      }
+
+      // Simpan catatan ke Firestore
       await addDoc(collection(db, 'catatanPiket'), {
         reportId: reportId,
         catatan: catatan.trim(),
         createdBy: doc(db, 'users', currentUser.uid),
         createdAt: new Date(),
-        reportDate: reportDateRaw
+        reportDate: reportDateRaw,
+        userPiket: userPiketId
       });
+
+      // Hapus dokumen piket karena ditolak
+      await deleteDoc(piketRef);
 
       setSent(true);
     } catch (err) {
