@@ -290,7 +290,14 @@ const Me = () => {
             )}
 
             {/* Poin Asrama */}
-            <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
+            <div style={{ 
+              gridColumn: 'span 2', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '6px', 
+              marginTop: '10px',
+              position: 'relative' 
+            }}>
               <span style={{ fontSize: '0.75rem', color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Skor Poin Asrama</span>
               {(() => {
                 const p = userData.point ?? 0;
@@ -328,7 +335,13 @@ const Me = () => {
                     boxShadow: `0 4px 0 ${borderCol}`,
                     color: textCol,
                     fontWeight: 800,
-                    transition: 'transform 0.1s'
+                    transition: 'transform 0.1s',
+                    ...(userData?.statusPenghuni === 'CALON' ? {
+                      filter: 'blur(2px)',
+                      opacity: 0.7,
+                      pointerEvents: 'none',
+                      userSelect: 'none'
+                    } : {})
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{ fontSize: '1.5rem' }}>🏆</span>
@@ -353,6 +366,36 @@ const Me = () => {
                   </div>
                 );
               })()}
+              
+              {userData?.statusPenghuni === 'CALON' && (
+                <div style={{
+                  position: 'absolute',
+                  top: '20px', left: 0, right: 0, bottom: 0,
+                  backgroundColor: isDark ? 'rgba(45, 29, 19, 0.3)' : 'rgba(255, 255, 255, 0.3)',
+                  backdropFilter: 'blur(2px)',
+                  WebkitBackdropFilter: 'blur(2px)',
+                  borderRadius: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10,
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.4)'}`
+                }}>
+                  <div style={{
+                    backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)',
+                    padding: '8px 16px',
+                    borderRadius: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}>
+                    <span style={{ fontSize: '1.2rem' }}>🔒</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 800, color: isDark ? '#FFFFFF' : '#1F2937' }}>Khusus Penghuni</span>
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>

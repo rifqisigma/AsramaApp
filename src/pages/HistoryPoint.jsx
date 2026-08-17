@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Clock, User } from 'lucide-react';
+import { ArrowLeft, Search, Clock, User, Shield } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 const HistoryPoint = () => {
@@ -12,10 +12,24 @@ const HistoryPoint = () => {
   const [histories, setHistories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [authorized, setAuthorized] = useState(true);
 
   useEffect(() => {
     const fetchHistories = async () => {
       try {
+        if (!auth.currentUser) {
+          setAuthorized(false);
+          setLoading(false);
+          return;
+        }
+        
+        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        if (userDoc.exists() && userDoc.data().statusPenghuni === 'CALON') {
+          setAuthorized(false);
+          setLoading(false);
+          return;
+        }
+
         const snap = await getDocs(collection(db, 'historyPoint'));
         const raw = [];
         snap.forEach(d => raw.push({ id: d.id, ...d.data() }));
@@ -68,6 +82,73 @@ const HistoryPoint = () => {
       (h.resolvedUsername || '').toLowerCase().includes(q)
     );
   });
+
+  if (!authorized) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: isDark ? '#1E130C' : '#FFF9F5',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+        fontFamily: '"Nunito", "Inter", sans-serif'
+      }}>
+        <div style={{
+          backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+          borderRadius: '28px',
+          padding: '40px 24px',
+          border: `2.5px solid ${isDark ? '#4A2E1E' : '#FECACA'}`,
+          boxShadow: isDark ? '0 8px 0 #4A2E1E' : '0 8px 0 #FEE2E2',
+          textAlign: 'center',
+          maxWidth: '400px',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '20px'
+        }}>
+          <div style={{
+            backgroundColor: isDark ? '#4C1D1D' : '#FEE2E2',
+            color: '#EF4444',
+            padding: '16px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 10px rgba(239, 68, 68, 0.15)'
+          }}>
+            <Shield size={48} strokeWidth={2.5} />
+          </div>
+          <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937' }}>
+            Akses Ditolak 🔒
+          </h2>
+          <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280', lineHeight: 1.5 }}>
+            Mohon maaf, halaman riwayat poin ini hanya dapat diakses oleh Penghuni Asrama.
+          </p>
+          <button
+            onClick={() => navigate('/home')}
+            style={{
+              width: '100%',
+              backgroundColor: '#F97316',
+              color: '#FFFFFF',
+              border: '2px solid #EA580C',
+              borderRadius: '20px',
+              padding: '14px',
+              fontSize: '1rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 4px 0 #EA580C',
+              outline: 'none',
+              marginTop: '10px'
+            }}
+          >
+            Kembali ke Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
