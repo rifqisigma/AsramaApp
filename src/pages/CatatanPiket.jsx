@@ -43,31 +43,45 @@ const CatatanPiket = () => {
     setLoading(true);
     try {
       const currentUser = auth.currentUser;
-      const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
-      const username = userSnap.exists() ? (userSnap.data().username || currentUser.email) : currentUser.email;
+      if (!currentUser) {
+        alert('Anda belum login.');
+        setLoading(false);
+        return;
+      }
 
-      // Ambil data piket untuk mendapatkan userPiket
+      // Ambil data piket untuk mendapatkan userPiket (target notif)
       const piketRef = doc(db, 'piket', reportId);
       const piketSnap = await getDoc(piketRef);
-      
+
+      if (!piketSnap.exists()) {
+        alert('Data piket tidak ditemukan atau sudah dihapus.');
+        setLoading(false);
+        return;
+      }
+
+      const piketData = piketSnap.data();
+
+      // Ekstrak userPiket ID secara aman
       let userPiketId = null;
-      if (piketSnap.exists()) {
-        const piketData = piketSnap.data();
-        if (piketData.userPiket) {
-          userPiketId = typeof piketData.userPiket === 'string'
-            ? piketData.userPiket
-            : (piketData.userPiket.id || piketData.userPiket.path?.split('/').pop());
+      if (piketData.userPiket) {
+        if (typeof piketData.userPiket === 'string') {
+          userPiketId = piketData.userPiket;
+        } else if (piketData.userPiket.id) {
+          userPiketId = piketData.userPiket.id;
+        } else if (piketData.userPiket.path) {
+          const parts = piketData.userPiket.path.split('/');
+          userPiketId = parts[parts.length - 1];
         }
       }
 
-      // Simpan catatan ke Firestore
+      // Simpan catatan ke Firestore — ini akan mentrigger Cloud Function untuk kirim notif
       await addDoc(collection(db, 'catatanPiket'), {
         reportId: reportId,
         catatan: catatan.trim(),
-        createdBy: doc(db, 'users', currentUser.uid),
+        createdBy: currentUser.uid,
         createdAt: new Date(),
         reportDate: reportDateRaw,
-        userPiket: userPiketId
+        userPiket: userPiketId || null
       });
 
       // Hapus dokumen piket karena ditolak
@@ -76,7 +90,7 @@ const CatatanPiket = () => {
       setSent(true);
     } catch (err) {
       console.error('Gagal mengirim catatan:', err);
-      alert('Terjadi kesalahan saat mengirim catatan.');
+      alert('Terjadi kesalahan saat mengirim catatan: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }

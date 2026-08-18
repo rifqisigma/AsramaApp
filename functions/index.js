@@ -143,8 +143,8 @@ exports.onCatatanPiketCreated = onDocumentCreated("catatanPiket/{catatanId}", as
 
   if (!reporterId) return;
 
-  const title = "Laporan Piket Ditolak";
-  const body = `Alasan: ${data.catatan || "Tidak ada alasan."}`;
+  const title = "Piket";
+  const body = `Piket karena kamu ditolak karena ${data.catatan || "tidak ada alasan."}`;
 
   await sendNotification(reporterId, title, body, {
     link: "/history",

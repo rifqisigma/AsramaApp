@@ -4,7 +4,7 @@ import { collection, addDoc, doc, GeoPoint } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
-import { ArrowLeft, MapPin, Navigation, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, MapPin, Navigation, CheckCircle, AlertTriangle, RefreshCw, Lock, Clock } from 'lucide-react';
 
 const FormAbsenMalam = () => {
   const navigate = useNavigate();
@@ -18,6 +18,50 @@ const FormAbsenMalam = () => {
   const [coords, setCoords] = useState(null);
   const [address, setAddress] = useState('');
   const [success, setSuccess] = useState(false);
+
+  // Time-based lock: only open 22:00-22:30 WIB
+  const [isOpen, setIsOpen] = useState(false);
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    const checkTime = () => {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const totalMinutes = hours * 60 + minutes;
+
+      const openTime = 22 * 60; // 22:00
+      const closeTime = 22 * 60 + 30; // 22:30
+
+      if (totalMinutes >= openTime && totalMinutes < closeTime) {
+        setIsOpen(true);
+        const remainingMinutes = closeTime - totalMinutes;
+        const remainingSecs = 60 - now.getSeconds();
+        if (remainingMinutes <= 1) {
+          setTimeLeft(`${remainingSecs} detik lagi`);
+        } else {
+          setTimeLeft(`${remainingMinutes} menit lagi`);
+        }
+      } else {
+        setIsOpen(false);
+        if (totalMinutes < openTime) {
+          const diff = openTime - totalMinutes;
+          const h = Math.floor(diff / 60);
+          const m = diff % 60;
+          setTimeLeft(h > 0 ? `${h} jam ${m} menit lagi` : `${m} menit lagi`);
+        } else {
+          const diff = (24 * 60 - totalMinutes) + openTime;
+          const h = Math.floor(diff / 60);
+          const m = diff % 60;
+          setTimeLeft(h > 0 ? `${h} jam ${m} menit lagi` : `${m} menit lagi`);
+        }
+      }
+    };
+
+    checkTime();
+    const interval = setInterval(checkTime, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Auto request location on mount
   useEffect(() => {
