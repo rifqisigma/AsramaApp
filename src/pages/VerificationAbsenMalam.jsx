@@ -85,8 +85,8 @@ const VerificationAbsenMalam = () => {
         const userDocRef = doc(db, 'users', auth.currentUser.uid);
         const userSnap = await getDoc(userDocRef);
         if (userSnap.exists()) {
-          const userData = userSnap.data();
-          if (userData.statusPenghuni !== 'CALON') {
+          const status = userData.statusPenghuni || userData.status_penghuni;
+          if (status !== 'CALON') {
             setAuthorized(true);
             await loadData();
           } else {

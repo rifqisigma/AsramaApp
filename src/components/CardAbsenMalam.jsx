@@ -9,7 +9,7 @@ const CardAbsenMalam = ({ userData, theme, navigate }) => {
   const titleColor = isDark ? '#FFFFFF' : '#1C1C1E';
   const descColor = isDark ? '#D1D5DB' : '#6B7280';
 
-  const isCalon = userData?.statusPenghuni === 'CALON';
+  const isCalon = (userData?.statusPenghuni || userData?.status_penghuni) === 'CALON';
 
   // Time-based lock for Form: only open 22:00-22:30 WIB
   const [isOpen, setIsOpen] = useState(false);
@@ -69,13 +69,7 @@ const CardAbsenMalam = ({ userData, theme, navigate }) => {
           display: 'flex',
           flexDirection: 'column',
           gap: '16px',
-          transition: 'all 0.3s ease',
-          ...(isCalon ? {
-            filter: 'blur(2px)',
-            opacity: 0.7,
-            pointerEvents: 'none',
-            userSelect: 'none'
-          } : {})
+          transition: 'all 0.3s ease'
         }}
       >
         {/* Header with Title & Status Badge */}
@@ -185,44 +179,6 @@ const CardAbsenMalam = ({ userData, theme, navigate }) => {
           )}
         </div>
       </div>
-
-      {/* Lock Overlay for CALON Penghuni */}
-      {isCalon && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: isDark ? 'rgba(45, 29, 19, 0.3)' : 'rgba(255, 255, 255, 0.3)',
-            backdropFilter: 'blur(4px)',
-            WebkitBackdropFilter: 'blur(4px)',
-            borderRadius: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10,
-            border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.4)'}`
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)',
-              padding: '12px 24px',
-              borderRadius: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-            }}
-          >
-            <span style={{ fontSize: '1.5rem' }}>🔒</span>
-            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: titleColor }}>Khusus Penghuni</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
