@@ -49,7 +49,7 @@ const CatatanPiket = () => {
         return;
       }
 
-      // Ambil data piket untuk mendapatkan userPiket (target notif)
+      // Ambil data piket untuk mendapatkan userPiket (target notif penolakan)
       const piketRef = doc(db, 'piket', reportId);
       const piketSnap = await getDoc(piketRef);
 
@@ -61,13 +61,11 @@ const CatatanPiket = () => {
 
       const piketData = piketSnap.data();
 
-      // Ekstrak userPiket ID secara aman
+      // Ekstrak userPiket ID (santri yang piket) secara aman
       let userPiketId = null;
-      console.log('[CatatanPiket] piketData.userPiket raw:', piketData.userPiket);
-      console.log('[CatatanPiket] typeof piketData.userPiket:', typeof piketData.userPiket);
       if (piketData.userPiket) {
         if (typeof piketData.userPiket === 'string') {
-          userPiketId = piketData.userPiket;
+          userPiketId = piketData.userPiket.replace(/^\/?users\//, '');
         } else if (piketData.userPiket.id) {
           userPiketId = piketData.userPiket.id;
         } else if (piketData.userPiket.path) {
@@ -75,18 +73,23 @@ const CatatanPiket = () => {
           userPiketId = parts[parts.length - 1];
         }
       }
-      console.log('[CatatanPiket] Extracted userPiketId:', userPiketId);
 
-      // Simpan catatan ke Firestore — ini akan mentrigger Cloud Function untuk kirim notif
+      if (!userPiketId) {
+        console.warn('[CatatanPiket] userPiket tidak ditemukan pada data piket');
+      }
+
+      // Simpan catatan ke Firestore — target userPiket (bukan laporTo/supervisor)
       const catatanDoc = await addDoc(collection(db, 'catatanPiket'), {
         reportId: reportId,
         catatan: catatan.trim(),
         createdBy: currentUser.uid,
         createdAt: new Date(),
         reportDate: reportDateRaw,
-        userPiket: userPiketId || null
+        userPiket: userPiketId ? doc(db, 'users', userPiketId) : null,
+        userPiketId: userPiketId || null,
+        laporTo: piketData.laporTo || doc(db, 'users', currentUser.uid)
       });
-      console.log('[CatatanPiket] Catatan saved with ID:', catatanDoc.id, 'userPiket:', userPiketId);
+      console.log('[CatatanPiket] Catatan saved with ID:', catatanDoc.id, 'Target userPiket:', userPiketId);
 
       setSent(true);
     } catch (err) {
@@ -127,7 +130,7 @@ const CatatanPiket = () => {
             Catatan gagal verifikasi telah dikirim sebagai notifikasi.
           </p>
           <button
-            onClick={() => navigate('/tanda-tangan-piket')}
+            onClick={() => navigate('/ttd-piket')}
             style={{
               width: '100%',
               padding: '14px',

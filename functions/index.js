@@ -131,22 +131,51 @@ exports.onPiketVerified = onDocumentUpdated("piket/{piketId}", async (event) => 
 
 /**
  * Trigger: When catatan piket is created (piket rejected)
- * Send notification to the reporter (userPiket)
+ * Send notification to the student on duty (userPiket), NOT to supervisor (laporTo)
  */
 exports.onCatatanPiketCreated = onDocumentCreated("catatanPiket/{catatanId}", async (event) => {
   const data = event.data.data();
-  if (!data || !data.userPiket) return;
+  if (!data) return;
 
-  const reporterId = typeof data.userPiket === 'string'
-    ? data.userPiket
-    : (data.userPiket.id || data.userPiket.path?.split('/').pop());
+  // Extract userPiket ID (the student who submitted the piket report)
+  let targetUserId = null;
 
-  if (!reporterId) return;
+  if (data.userPiketId) {
+    targetUserId = data.userPiketId;
+  } else if (data.userPiket) {
+    if (typeof data.userPiket === 'string') {
+      targetUserId = data.userPiket.replace(/^\/?users\//, '');
+    } else {
+      targetUserId = data.userPiket.id || data.userPiket.path?.split('/').pop();
+    }
+  }
 
-  const title = "Piket";
-  const body = `Piket karena kamu ditolak karena ${data.catatan || "tidak ada alasan."}`;
+  // Fallback: If not found directly in catatanPiket, read from original piket document
+  if (!targetUserId && data.reportId) {
+    try {
+      const piketDoc = await db.collection("piket").doc(data.reportId).get();
+      if (piketDoc.exists) {
+        const piketData = piketDoc.data();
+        if (piketData.userPiket) {
+          targetUserId = typeof piketData.userPiket === 'string'
+            ? piketData.userPiket.replace(/^\/?users\//, '')
+            : (piketData.userPiket.id || piketData.userPiket.path?.split('/').pop());
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching piketDoc in onCatatanPiketCreated:", e);
+    }
+  }
 
-  await sendNotification(reporterId, title, body, {
+  if (!targetUserId) {
+    console.log("No valid userPiket found for rejection notification:", event.params.catatanId);
+    return;
+  }
+
+  const title = "Piket Ditolak ⚠️";
+  const body = `Laporan piket Anda ditolak: "${data.catatan || "Tidak memenuhi kriteria"}"`;
+
+  await sendNotification(targetUserId, title, body, {
     link: "/history",
     type: "piket_rejected",
     catatanId: event.params.catatanId,
