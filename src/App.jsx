@@ -24,6 +24,8 @@ import CatatanPiket from './pages/CatatanPiket';
 import CreateBerita from './pages/CreateBerita';
 import MonitoringAll from './pages/MonitoringAll';
 import PiketPersonDetail from './pages/PiketPersonDetail';
+import AllPersonPoint from './pages/AllPersonPoint';
+import DetailPersonPoint from './pages/DetailPersonPoint';
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -116,6 +118,9 @@ function App() {
             <Route path="/monitoring-all" element={user ? <MonitoringAll /> : <Navigate to="/login" />} />
             <Route path="/piket-person-detail" element={user ? <PiketPersonDetail /> : <Navigate to="/login" />} />
             <Route path="/piket-personal-detail" element={user ? <PiketPersonDetail /> : <Navigate to="/login" />} />
+            <Route path="/all-person-point" element={user ? <AllPersonPoint /> : <Navigate to="/login" />} />
+            <Route path="/all-persont-point" element={user ? <AllPersonPoint /> : <Navigate to="/login" />} />
+            <Route path="/detail-person-point" element={user ? <DetailPersonPoint /> : <Navigate to="/login" />} />
             <Route path="/" element={<Navigate to={user ? "/home" : "/login"} />} />
           </Routes>
         </Router>

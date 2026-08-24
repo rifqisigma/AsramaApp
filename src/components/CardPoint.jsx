@@ -117,32 +117,58 @@ const CardPoint = ({ userData, theme }) => {
 
         {/* Action buttons */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <button
-            onClick={() => navigate('/see-points')}
-            style={{
-              width: '100%',
-              padding: '14px',
-              backgroundColor: '#F59E0B',
-              color: 'white',
-              border: 'none',
-              borderRadius: '16px',
-              fontSize: '0.95rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: '0 4px 0 #D97706',
-              transition: 'transform 0.1s, box-shadow 0.1s',
-              outline: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
-            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(4px)'; e.currentTarget.style.boxShadow = '0 0px 0 #D97706'; }}
-            onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0px)'; e.currentTarget.style.boxShadow = '0 4px 0 #D97706'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0px)'; e.currentTarget.style.boxShadow = '0 4px 0 #D97706'; }}
-          >
-            <span>🔍 Lihat Point2</span>
-          </button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <button
+              onClick={() => navigate('/see-points')}
+              style={{
+                padding: '13px',
+                backgroundColor: '#F59E0B',
+                color: 'white',
+                border: 'none',
+                borderRadius: '16px',
+                fontSize: '0.88rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 4px 0 #D97706',
+                transition: 'transform 0.1s, box-shadow 0.1s',
+                outline: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+              onMouseDown={e => { e.currentTarget.style.transform = 'translateY(4px)'; e.currentTarget.style.boxShadow = '0 0px 0 #D97706'; }}
+              onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0px)'; e.currentTarget.style.boxShadow = '0 4px 0 #D97706'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0px)'; e.currentTarget.style.boxShadow = '0 4px 0 #D97706'; }}
+            >
+              <span>🔍 Lihat Aturan</span>
+            </button>
+            <button
+              onClick={() => navigate('/all-person-point')}
+              style={{
+                padding: '13px',
+                backgroundColor: '#3B82F6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '16px',
+                fontSize: '0.88rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 4px 0 #1D4ED8',
+                transition: 'transform 0.1s, box-shadow 0.1s',
+                outline: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+              onMouseDown={e => { e.currentTarget.style.transform = 'translateY(4px)'; e.currentTarget.style.boxShadow = '0 0px 0 #1D4ED8'; }}
+              onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0px)'; e.currentTarget.style.boxShadow = '0 4px 0 #1D4ED8'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0px)'; e.currentTarget.style.boxShadow = '0 4px 0 #1D4ED8'; }}
+            >
+              <span>📊 Rekap Poin</span>
+            </button>
+          </div>
           {/* Staff‑only buttons – rendered conditionally in Home */}
           {(userData?.jabatan?.toLowerCase() === 'kepenghunian' || userData?.jabatan?.toLowerCase() === 'proteksi') && (
             <div style={{

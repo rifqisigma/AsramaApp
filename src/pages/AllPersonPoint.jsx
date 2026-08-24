@@ -5,32 +5,28 @@ import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import {
   ArrowLeft,
   Search,
-  Calendar,
-  User,
-  Filter,
-  RotateCcw,
-  Layers,
+  Scale,
   ShieldAlert,
   ChevronRight,
-  MapPin,
-  Clock,
-  CheckCircle
+  Sparkles,
+  Award,
+  AlertTriangle
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import MonitoringFilterForm from '../components/MonitoringFilterForm';
 
-const MonitoringAll = () => {
+const AllPersonPoint = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  // Access state
+  // Access state (Only statusPenghuni !== 'CALON')
   const [isAuthorized, setIsAuthorized] = useState(true);
 
   // Filter States
   const [namaFilter, setNamaFilter] = useState('');
   const [angkatanFilter, setAngkatanFilter] = useState('ALL');
-  const [tanggalFilter, setTanggalFilter] = useState('');
+  const [statusPoinFilter, setStatusPoinFilter] = useState('ALL'); // ALL, AMAN, PERHATIAN, KRITIS, PELANGGARAN, PRESTASI
 
   // Results State
   const [hasQueried, setHasQueried] = useState(false);
@@ -86,9 +82,9 @@ const MonitoringAll = () => {
     setHasQueried(true);
 
     try {
-      const [usersSnap, piketSnap] = await Promise.all([
+      const [usersSnap, historySnap] = await Promise.all([
         getDocs(collection(db, 'users')),
-        getDocs(collection(db, 'piket'))
+        getDocs(collection(db, 'historyPoint'))
       ]);
 
       const userMap = new Map();
@@ -101,70 +97,40 @@ const MonitoringAll = () => {
           angkatan: uData.angkatan ? String(uData.angkatan) : '?',
           prodi: uData.prodi || '',
           fotoProfil: uData.fotoProfil || null,
-          jabatan: uData.jabatan || '',
-          totalPiket: 0,
-          verifiedCount: 0,
-          pendingCount: 0
+          point: typeof uData.point === 'number' ? uData.point : 100,
+          pelanggaranCount: 0,
+          prestasiCount: 0,
+          totalTransactions: 0
         });
       });
 
-      piketSnap.forEach((docSnap) => {
-        const pData = docSnap.data();
-
+      // Count point histories per user
+      historySnap.forEach((docSnap) => {
+        const hData = docSnap.data();
         let targetUid = null;
-        if (pData.userPiket) {
-          if (typeof pData.userPiket === 'string') {
-            targetUid = pData.userPiket.replace(/^\/?users\//, '');
-          } else if (pData.userPiket.id) {
-            targetUid = pData.userPiket.id;
-          } else if (pData.userPiket.path) {
-            const parts = pData.userPiket.path.split('/');
+
+        if (hData.userref) {
+          if (typeof hData.userref === 'string') {
+            targetUid = hData.userref.replace(/^\/?users\//, '');
+          } else if (hData.userref.id) {
+            targetUid = hData.userref.id;
+          } else if (hData.userref.path) {
+            const parts = hData.userref.path.split('/');
             targetUid = parts[parts.length - 1];
           }
         }
 
-        if (!targetUid) return;
-
-        let piketDateObj = null;
-        if (pData.timestamp?.toDate) {
-          piketDateObj = pData.timestamp.toDate();
-        } else if (pData.timestamp) {
-          piketDateObj = new Date(pData.timestamp);
-        } else if (pData.timestampMaxPiket?.toDate) {
-          piketDateObj = pData.timestampMaxPiket.toDate();
-        } else if (pData.timestampMaxPiket) {
-          piketDateObj = new Date(pData.timestampMaxPiket);
-        }
-
-        if (tanggalFilter) {
-          if (!piketDateObj) return;
-          const piketDateStr = piketDateObj.toISOString().slice(0, 10);
-          if (piketDateStr !== tanggalFilter) return;
-        }
-
-        const isVerified = pData.verification === true;
-
-        if (userMap.has(targetUid)) {
+        if (targetUid && userMap.has(targetUid)) {
           const u = userMap.get(targetUid);
-          u.totalPiket += 1;
-          if (isVerified) {
-            u.verifiedCount += 1;
+          const pointVal = typeof hData.point === 'number' ? hData.point : Number(hData.point) || 0;
+          const isNegative = pointVal < 0 || hData.type === 'pengurangan';
+
+          u.totalTransactions += 1;
+          if (isNegative) {
+            u.pelanggaranCount += 1;
           } else {
-            u.pendingCount += 1;
+            u.prestasiCount += 1;
           }
-        } else {
-          userMap.set(targetUid, {
-            id: targetUid,
-            username: 'User (' + targetUid.slice(0, 5) + ')',
-            name: 'User (' + targetUid.slice(0, 5) + ')',
-            angkatan: '?',
-            prodi: '',
-            fotoProfil: null,
-            jabatan: '',
-            totalPiket: 1,
-            verifiedCount: isVerified ? 1 : 0,
-            pendingCount: isVerified ? 0 : 1
-          });
         }
       });
 
@@ -172,35 +138,40 @@ const MonitoringAll = () => {
       const queryName = namaFilter.trim().toLowerCase();
 
       userMap.forEach((user) => {
-        const hasPikets = user.totalPiket > 0;
         const matchesName =
           !queryName ||
           user.username.toLowerCase().includes(queryName) ||
           user.name.toLowerCase().includes(queryName);
+
         const matchesAngkatan =
           angkatanFilter === 'ALL' || String(user.angkatan).trim() === angkatanFilter.trim();
 
-        if (tanggalFilter && user.totalPiket === 0) return;
+        // Status Poin Filter
+        let matchesStatus = true;
+        if (statusPoinFilter === 'AMAN') {
+          matchesStatus = user.point >= 100;
+        } else if (statusPoinFilter === 'PERHATIAN') {
+          matchesStatus = user.point >= 75 && user.point < 100;
+        } else if (statusPoinFilter === 'KRITIS') {
+          matchesStatus = user.point < 75;
+        } else if (statusPoinFilter === 'PELANGGARAN') {
+          matchesStatus = user.pelanggaranCount > 0;
+        } else if (statusPoinFilter === 'PRESTASI') {
+          matchesStatus = user.prestasiCount > 0;
+        }
 
-        if (matchesName && matchesAngkatan && (hasPikets || queryName.length > 0)) {
+        if (matchesName && matchesAngkatan && matchesStatus) {
           results.push(user);
         }
       });
 
-      results.sort((a, b) => {
-        if (b.pendingCount !== a.pendingCount) {
-          return b.pendingCount - a.pendingCount;
-        }
-        if (b.totalPiket !== a.totalPiket) {
-          return b.totalPiket - a.totalPiket;
-        }
-        return a.name.localeCompare(b.name);
-      });
+      // Sort by point ascending (lowest points first so critical ones stand out)
+      results.sort((a, b) => a.point - b.point || a.name.localeCompare(b.name));
 
       setAggregatedUsers(results);
-    } catch (error) {
-      console.error('Error querying piket monitoring data:', error);
-      alert('Gagal memuat data: ' + error.message);
+    } catch (err) {
+      console.error('Error querying point monitoring:', err);
+      alert('Gagal memuat data poin: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -209,15 +180,28 @@ const MonitoringAll = () => {
   const handleResetForm = () => {
     setNamaFilter('');
     setAngkatanFilter('ALL');
-    setTanggalFilter('');
+    setStatusPoinFilter('ALL');
     setHasQueried(false);
     setAggregatedUsers([]);
   };
 
   const handleGoToDetail = (personId) => {
-    window.location.href = `/piket-person-detail?userId=${personId}`;
+    navigate(`/detail-person-point?userId=${personId}`);
   };
 
+  const getPointColor = (point) => {
+    if (point >= 100) return '#10B981'; // Green
+    if (point >= 75) return '#F59E0B'; // Amber
+    return '#EF4444'; // Red
+  };
+
+  const getPointBadgeLabel = (point) => {
+    if (point >= 100) return 'Aman 🟢';
+    if (point >= 75) return 'Perlu Perhatian 🟡';
+    return 'Kritis! 🔴';
+  };
+
+  // RESTRICTED ACCESS SCREEN FOR CALON
   if (!isAuthorized) {
     return (
       <div
@@ -228,25 +212,25 @@ const MonitoringAll = () => {
           justifyContent: 'center',
           alignItems: 'center',
           fontFamily: '"Nunito", "Inter", sans-serif',
-          padding: '24px'
+          padding: '20px'
         }}
       >
         <div
           style={{
             backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
             borderRadius: '24px',
-            padding: '40px 28px',
+            padding: '36px 20px',
             textAlign: 'center',
             maxWidth: '420px',
             width: '100%',
             border: `2px solid ${isDark ? '#4A2E1E' : '#FEE2E2'}`,
-            boxShadow: isDark ? '0 8px 0 #4A2E1E' : '0 8px 0 #FEE2E2'
+            boxShadow: isDark ? '0 6px 0 #4A2E1E' : '0 6px 0 #FEE2E2'
           }}
         >
           <div
             style={{
-              width: '64px',
-              height: '64px',
+              width: '56px',
+              height: '56px',
               borderRadius: '50%',
               backgroundColor: isDark ? '#3C1C1C' : '#FEF2F2',
               display: 'inline-flex',
@@ -257,26 +241,27 @@ const MonitoringAll = () => {
               border: '2px solid #EF4444'
             }}
           >
-            <ShieldAlert size={32} />
+            <ShieldAlert size={28} />
           </div>
-          <h2 style={{ margin: '0 0 10px 0', fontSize: '1.3rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937' }}>
+          <h2 style={{ margin: '0 0 10px 0', fontSize: '1.25rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937' }}>
             Akses Dibatasi
           </h2>
-          <p style={{ margin: '0 0 24px 0', fontSize: '0.9rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280', lineHeight: 1.5 }}>
-            Fitur <b>Monitoring Piket Penghuni</b> hanya dapat diakses oleh penghuni tetap asrama (bukan calon penghuni).
+          <p style={{ margin: '0 0 20px 0', fontSize: '0.88rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280', lineHeight: 1.5 }}>
+            Fitur <b>Monitoring Poin Penghuni</b> hanya dapat diakses oleh penghuni tetap asrama (bukan calon penghuni).
           </p>
           <button
-            onClick={() => (window.location.href = '/home')}
+            onClick={() => navigate('/home')}
             style={{
               width: '100%',
-              padding: '14px',
-              backgroundColor: '#F97316',
+              padding: '13px',
+              backgroundColor: '#F59E0B',
               color: 'white',
-              border: '2px solid #EA580C',
-              borderRadius: '16px',
-              fontSize: '1rem',
+              border: '2px solid #D97706',
+              borderRadius: '14px',
+              fontSize: '0.95rem',
               fontWeight: 800,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              boxShadow: '0 4px 0 #D97706'
             }}
           >
             Kembali ke Home
@@ -304,16 +289,16 @@ const MonitoringAll = () => {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            color: isDark ? '#F97316' : '#4B5563',
+            color: isDark ? '#F59E0B' : '#4B5563',
             textDecoration: 'none',
             fontWeight: 800,
             fontSize: '0.88rem',
             marginBottom: '16px',
             backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
-            border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+            border: `2px solid ${isDark ? '#4A2E1E' : '#FEF08A'}`,
             padding: '7px 14px',
             borderRadius: '16px',
-            boxShadow: isDark ? '0 3px 0 #4A2E1E' : '0 3px 0 #FFEDD5'
+            boxShadow: isDark ? '0 3px 0 #4A2E1E' : '0 3px 0 #FEF08A'
           }}
         >
           <ArrowLeft size={16} strokeWidth={2.5} />
@@ -326,9 +311,9 @@ const MonitoringAll = () => {
             backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
             borderRadius: '20px',
             padding: '18px 16px',
-            border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
-            borderTop: '8px solid #F97316',
-            boxShadow: isDark ? '0 6px 0 #4A2E1E' : '0 6px 0 #FFEDD5',
+            border: `2px solid ${isDark ? '#4A2E1E' : '#FEF08A'}`,
+            borderTop: '8px solid #F59E0B',
+            boxShadow: isDark ? '0 6px 0 #4A2E1E' : '0 6px 0 #FEF08A',
             marginBottom: '16px'
           }}
         >
@@ -338,8 +323,8 @@ const MonitoringAll = () => {
                 width: '44px',
                 height: '44px',
                 borderRadius: '14px',
-                backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
-                border: '2px solid #F97316',
+                backgroundColor: isDark ? '#3D291C' : '#FEF9C3',
+                border: '2px solid #F59E0B',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -347,7 +332,7 @@ const MonitoringAll = () => {
                 flexShrink: 0
               }}
             >
-              🧹
+              🏆
             </div>
             <div>
               <h1
@@ -359,7 +344,7 @@ const MonitoringAll = () => {
                   lineHeight: 1.25
                 }}
               >
-                Monitoring Piket Penghuni
+                Monitoring Poin Penghuni
               </h1>
               <p
                 style={{
@@ -369,15 +354,15 @@ const MonitoringAll = () => {
                   color: isDark ? '#FED7AA' : '#6B7280'
                 }}
               >
-                Pantau laporan piket seluruh penghuni
+                Pantau poin kelayakan huni seluruh asrama
               </p>
             </div>
           </div>
         </div>
 
-        {/* Modular Filter Form */}
+        {/* Modular Filter Form Component */}
         <MonitoringFilterForm
-          title="Opsi Pencarian"
+          title="Opsi Pencarian Poin"
           namaFilter={namaFilter}
           setNamaFilter={setNamaFilter}
           angkatanFilter={angkatanFilter}
@@ -386,118 +371,126 @@ const MonitoringAll = () => {
           onSubmit={handleSearch}
           onReset={handleResetForm}
           loading={loading}
-          submitLabel="Lihat Data Piket"
-          accentColor="#F97316"
-          accentBorderColor="#EA580C"
-          accentShadowColor="#C2410C"
-          hasActiveFilter={Boolean(namaFilter || angkatanFilter !== 'ALL' || tanggalFilter || hasQueried)}
+          submitLabel="Lihat Data Poin"
+          accentColor="#F59E0B"
+          accentBorderColor="#D97706"
+          accentShadowColor="#B45309"
+          hasActiveFilter={Boolean(namaFilter || angkatanFilter !== 'ALL' || statusPoinFilter !== 'ALL' || hasQueried)}
           extraFilterComponent={
             <div>
               <label
                 style={{
                   display: 'block',
-                  fontSize: '0.85rem',
+                  fontSize: '0.82rem',
                   fontWeight: 800,
                   color: isDark ? '#FED7AA' : '#374151',
-                  marginBottom: '6px'
+                  marginBottom: '5px'
                 }}
               >
-                Tanggal Piket
+                Status Kelayakan
               </label>
               <div style={{ position: 'relative' }}>
-                <Calendar
-                  size={18}
+                <Scale
+                  size={17}
                   style={{
                     position: 'absolute',
-                    left: '12px',
+                    left: '11px',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     color: '#9CA3AF',
                     pointerEvents: 'none'
                   }}
                 />
-                <input
-                  type="date"
-                  value={tanggalFilter}
-                  onChange={(e) => setTanggalFilter(e.target.value)}
+                <select
+                  value={statusPoinFilter}
+                  onChange={(e) => setStatusPoinFilter(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '11px 8px 11px 36px',
-                    borderRadius: '14px',
+                    padding: '11px 8px 11px 34px',
+                    borderRadius: '12px',
                     border: isDark ? '2px solid #4A2E1E' : '2px solid #E5E7EB',
                     backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
                     color: isDark ? '#FFFFFF' : '#111827',
                     fontSize: '0.85rem',
                     fontWeight: 700,
                     outline: 'none',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    cursor: 'pointer',
+                    textOverflow: 'ellipsis'
                   }}
-                />
+                >
+                  <option value="ALL">Semua Status</option>
+                  <option value="AMAN">Poin Aman (≥100) 🟢</option>
+                  <option value="PERHATIAN">Perhatian (75-99) 🟡</option>
+                  <option value="KRITIS">Poin Kritis (&lt;75) 🔴</option>
+                  <option value="PELANGGARAN">Punya Pelanggaran ⚠️</option>
+                  <option value="PRESTASI">Punya Prestasi 🏆</option>
+                </select>
               </div>
             </div>
           }
         />
 
-        {/* Results */}
+        {/* Results Section */}
         {!hasQueried ? (
           <div
             style={{
               backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
-              borderRadius: '24px',
-              padding: '36px 24px',
+              borderRadius: '20px',
+              padding: '32px 16px',
               textAlign: 'center',
-              border: `2px dashed ${isDark ? '#4A2E1E' : '#FED7AA'}`,
-              boxShadow: isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FFEDD5'
+              border: `2px dashed ${isDark ? '#4A2E1E' : '#FEF08A'}`,
+              boxShadow: isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FEF08A'
             }}
           >
             <div
               style={{
-                width: '64px',
-                height: '64px',
+                width: '52px',
+                height: '52px',
                 borderRadius: '50%',
-                backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                backgroundColor: isDark ? '#3D291C' : '#FEF9C3',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '2rem',
-                marginBottom: '16px',
-                border: '2px solid #F97316'
+                fontSize: '1.6rem',
+                marginBottom: '12px',
+                border: '2px solid #F59E0B'
               }}
             >
               🔍
             </div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937' }}>
+            <h3 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937' }}>
               Belum Ada Data yang Ditampilkan
             </h3>
-            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280', lineHeight: 1.5 }}>
-              Pilih filter di atas lalu klik tombol <b>"Lihat Data Piket"</b>.
+            <p style={{ margin: 0, fontSize: '0.84rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280', lineHeight: 1.4 }}>
+              Pilih filter di atas lalu klik tombol <b>"Lihat Data Poin"</b>.
             </p>
           </div>
         ) : loading ? (
           <div
             style={{
               backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
-              borderRadius: '24px',
-              padding: '40px 24px',
+              borderRadius: '20px',
+              padding: '36px 16px',
               textAlign: 'center',
-              border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
-              boxShadow: isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FFEDD5'
+              border: `2px solid ${isDark ? '#4A2E1E' : '#FEF08A'}`,
+              boxShadow: isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FEF08A'
             }}
           >
             <div
               style={{
                 display: 'inline-block',
-                width: '40px',
-                height: '40px',
-                border: '4px solid #F97316',
+                width: '36px',
+                height: '36px',
+                border: '4px solid #F59E0B',
                 borderTopColor: 'transparent',
                 borderRadius: '50%',
                 animation: 'spin 0.8s linear infinite',
-                marginBottom: '16px'
+                marginBottom: '12px'
               }}
             />
-            <h3 style={{ margin: 0, color: isDark ? '#FFFFFF' : '#1F2937', fontWeight: 800 }}>
-              Mengambil Data Piket...
+            <h3 style={{ margin: 0, color: isDark ? '#FFFFFF' : '#1F2937', fontWeight: 800, fontSize: '1rem' }}>
+              Mengambil Data Poin Penghuni...
             </h3>
             <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
           </div>
@@ -505,31 +498,33 @@ const MonitoringAll = () => {
           <div
             style={{
               backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
-              borderRadius: '24px',
-              padding: '36px 24px',
+              borderRadius: '20px',
+              padding: '32px 16px',
               textAlign: 'center',
               border: `2px solid ${isDark ? '#4A2E1E' : '#FEE2E2'}`,
               boxShadow: isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FEE2E2'
             }}
           >
-            <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🍂</div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '1.15rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937' }}>
+            <div style={{ fontSize: '2.2rem', marginBottom: '10px' }}>🍂</div>
+            <h3 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937' }}>
               Tidak Ditemukan Data
             </h3>
-            <p style={{ margin: 0, fontSize: '0.88rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280' }}>
-              Tidak ada data piket yang cocok dengan filter.
+            <p style={{ margin: 0, fontSize: '0.84rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280' }}>
+              Tidak ada penghuni yang cocok dengan filter pencarian.
             </p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
-              <span style={{ fontSize: '0.9rem', fontWeight: 900, color: isDark ? '#FED7AA' : '#374151' }}>
-                Daftar Penghuni ({aggregatedUsers.length})
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
+              <span style={{ fontSize: '0.86rem', fontWeight: 900, color: isDark ? '#FED7AA' : '#374151' }}>
+                Daftar Poin Penghuni ({aggregatedUsers.length})
               </span>
             </div>
 
-            {/* Resident Cards */}
+            {/* Resident Point Cards */}
             {aggregatedUsers.map((person) => {
+              const isKritis = person.point < 75;
+
               return (
                 <div
                   key={person.id}
@@ -537,14 +532,16 @@ const MonitoringAll = () => {
                     backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
                     borderRadius: '18px',
                     padding: '14px 14px',
-                    border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
-                    boxShadow: isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FFEDD5',
+                    border: `2px solid ${
+                      isKritis ? '#EF4444' : isDark ? '#4A2E1E' : '#FEF08A'
+                    }`,
+                    boxShadow: isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FEF08A',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px'
                   }}
                 >
-                  {/* Top: Avatar, Name, Angkatan */}
+                  {/* Top: Avatar, Name & Score Pill */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                       <div
@@ -552,12 +549,12 @@ const MonitoringAll = () => {
                           width: '42px',
                           height: '42px',
                           borderRadius: '14px',
-                          backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
-                          border: '2px solid #F97316',
+                          backgroundColor: isDark ? '#3D291C' : '#FEF9C3',
+                          border: `2px solid ${getPointColor(person.point)}`,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: '#F97316',
+                          color: getPointColor(person.point),
                           fontWeight: 900,
                           fontSize: '1.1rem',
                           overflow: 'hidden',
@@ -592,9 +589,9 @@ const MonitoringAll = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
                           <span
                             style={{
-                              backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
-                              border: '1px solid #F97316',
-                              color: '#F97316',
+                              backgroundColor: isDark ? '#3D291C' : '#FEF9C3',
+                              border: '1px solid #F59E0B',
+                              color: '#D97706',
                               fontSize: '0.68rem',
                               fontWeight: 900,
                               padding: '1px 6px',
@@ -611,6 +608,25 @@ const MonitoringAll = () => {
                         </div>
                       </div>
                     </div>
+
+                    {/* Point score Pill */}
+                    <div
+                      style={{
+                        textAlign: 'right',
+                        backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
+                        padding: '5px 10px',
+                        borderRadius: '10px',
+                        border: `1.5px solid ${getPointColor(person.point)}`,
+                        flexShrink: 0
+                      }}
+                    >
+                      <div style={{ fontSize: '1.1rem', fontWeight: 900, color: getPointColor(person.point), lineHeight: 1.1 }}>
+                        {person.point} <span style={{ fontSize: '0.7rem', fontWeight: 800 }}>Poin</span>
+                      </div>
+                      <div style={{ fontSize: '0.6rem', fontWeight: 800, color: isDark ? '#9CA3AF' : '#6B7280', marginTop: '2px' }}>
+                        {getPointBadgeLabel(person.point)}
+                      </div>
+                    </div>
                   </div>
 
                   {/* 3 Metric Badges */}
@@ -624,8 +640,29 @@ const MonitoringAll = () => {
                         textAlign: 'center'
                       }}
                     >
-                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#3B82F6' }}>{person.totalPiket}</div>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: isDark ? '#93C5FD' : '#2563EB' }}>TOTAL</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#3B82F6' }}>
+                        {person.totalTransactions}
+                      </div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: isDark ? '#93C5FD' : '#2563EB' }}>
+                        TOTAL
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        backgroundColor: isDark ? '#3C1C1C' : '#FEF2F2',
+                        border: `1.5px solid ${isDark ? '#7F1D1D' : '#FCA5A5'}`,
+                        borderRadius: '10px',
+                        padding: '6px 4px',
+                        textAlign: 'center'
+                      }}
+                    >
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#EF4444' }}>
+                        {person.pelanggaranCount}
+                      </div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: isDark ? '#FCA5A5' : '#DC2626' }}>
+                        MINUS
+                      </div>
                     </div>
 
                     <div
@@ -637,21 +674,12 @@ const MonitoringAll = () => {
                         textAlign: 'center'
                       }}
                     >
-                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#10B981' }}>{person.verifiedCount}</div>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: isDark ? '#6EE7B7' : '#059669' }}>VALID</div>
-                    </div>
-
-                    <div
-                      style={{
-                        backgroundColor: isDark ? '#451A03' : '#FFFBEB',
-                        border: `1.5px solid ${isDark ? '#92400E' : '#FDE68A'}`,
-                        borderRadius: '10px',
-                        padding: '6px 4px',
-                        textAlign: 'center'
-                      }}
-                    >
-                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#F59E0B' }}>{person.pendingCount}</div>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: isDark ? '#FCD34D' : '#D97706' }}>PENDING</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#10B981' }}>
+                        {person.prestasiCount}
+                      </div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: isDark ? '#6EE7B7' : '#059669' }}>
+                        PLUS
+                      </div>
                     </div>
                   </div>
 
@@ -663,7 +691,7 @@ const MonitoringAll = () => {
                       width: '100%',
                       padding: '11px',
                       borderRadius: '12px',
-                      backgroundColor: '#F97316',
+                      backgroundColor: '#F59E0B',
                       border: 'none',
                       color: 'white',
                       fontWeight: 900,
@@ -673,20 +701,20 @@ const MonitoringAll = () => {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      boxShadow: '0 3px 0 #EA580C',
+                      boxShadow: '0 3px 0 #D97706',
                       transition: 'transform 0.1s ease',
                       WebkitTapHighlightColor: 'transparent'
                     }}
                     onMouseDown={(e) => {
                       e.currentTarget.style.transform = 'translateY(2px)';
-                      e.currentTarget.style.boxShadow = '0 1px 0 #EA580C';
+                      e.currentTarget.style.boxShadow = '0 1px 0 #D97706';
                     }}
                     onMouseUp={(e) => {
                       e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 3px 0 #EA580C';
+                      e.currentTarget.style.boxShadow = '0 3px 0 #D97706';
                     }}
                   >
-                    <span>Lihat Detail Piket</span>
+                    <span>Riwayat & Detail Poin</span>
                     <ChevronRight size={16} strokeWidth={3} />
                   </button>
                 </div>
@@ -699,4 +727,4 @@ const MonitoringAll = () => {
   );
 };
 
-export default MonitoringAll;
+export default AllPersonPoint;
