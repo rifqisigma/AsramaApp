@@ -97,7 +97,7 @@ const AllPersonPoint = () => {
           angkatan: uData.angkatan ? String(uData.angkatan) : '?',
           prodi: uData.prodi || '',
           fotoProfil: uData.fotoProfil || null,
-          point: typeof uData.point === 'number' ? uData.point : 100,
+          point: typeof uData.point === 'number' ? uData.point : 110,
           pelanggaranCount: 0,
           prestasiCount: 0,
           totalTransactions: 0

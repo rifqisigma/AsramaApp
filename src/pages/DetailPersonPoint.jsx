@@ -35,7 +35,7 @@ const DetailPersonPoint = () => {
   const [userHistories, setUserHistories] = useState([]);
   const [detailFilter, setDetailFilter] = useState('ALL'); // ALL, PENGURANGAN, PENAMBAHAN
   const [detailStats, setDetailStats] = useState({
-    currentPoint: 100,
+    currentPoint: 110,
     totalPelanggaran: 0,
     minusPointTotal: 0,
     totalPrestasi: 0,
@@ -92,7 +92,7 @@ const DetailPersonPoint = () => {
           prodi: '',
           nim: '',
           fotoProfil: null,
-          point: 100
+          point: 110
         };
 
         if (userSnap.exists()) {
@@ -105,7 +105,7 @@ const DetailPersonPoint = () => {
             prodi: rawU.prodi || '',
             nim: rawU.nim || '',
             fotoProfil: rawU.fotoProfil || null,
-            point: typeof rawU.point === 'number' ? rawU.point : 100
+            point: typeof rawU.point === 'number' ? rawU.point : 110
           };
         }
         setTargetUser(uData);
@@ -475,7 +475,7 @@ const DetailPersonPoint = () => {
                       <span style={{ fontSize: '1.8rem', fontWeight: 900, color: getPointColor(detailStats.currentPoint) }}>
                         {detailStats.currentPoint}
                       </span>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: isDark ? '#9CA3AF' : '#6B7280' }}>/ 115 Poin</span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: isDark ? '#9CA3AF' : '#6B7280' }}>/ 110 Poin</span>
                     </div>
                   </div>
 
@@ -506,7 +506,7 @@ const DetailPersonPoint = () => {
                   <div
                     style={{
                       height: '100%',
-                      width: `${Math.min(100, Math.max(5, (detailStats.currentPoint / 115) * 100))}%`,
+                      width: `${Math.min(100, Math.max(5, (detailStats.currentPoint / 110) * 100))}%`,
                       backgroundColor: getPointColor(detailStats.currentPoint),
                       borderRadius: '8px',
                       transition: 'width 0.5s ease'

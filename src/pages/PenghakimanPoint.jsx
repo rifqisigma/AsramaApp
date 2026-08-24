@@ -180,10 +180,10 @@ const PenghakimanPoint = () => {
       const batch = writeBatch(db);
 
       for (const u of selectedUsers) {
-        // Calculate new point score — clamp ketat antara 0 (min) dan 115 (max)
+        // Calculate new point score — clamp ketat antara 0 (min) dan 110 (max)
         const currentPoint = u.point ?? 0;
         const rawPoint = currentPoint + totalDelta;
-        const newPoint = Math.min(115, Math.max(0, rawPoint));
+        const newPoint = Math.min(110, Math.max(0, rawPoint));
 
         // 1. Update users point in database
         const userDocRef = doc(db, 'users', u.id);
@@ -826,7 +826,7 @@ const PenghakimanPoint = () => {
               {selectedUsers.map(user => {
                 const currentScore = user.point ?? 0;
                 const rawScore = currentScore + totalDelta;
-                const nextScore = Math.min(115, Math.max(0, rawScore));
+                const nextScore = Math.min(110, Math.max(0, rawScore));
                 
                 return (
                   <div
