@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, PlusCircle, AlertCircle, Info, Sparkles, BookOpen, Lock } from 'lucide-react';
+import { ArrowLeft, PlusCircle, Sparkles, Lock, Tag, Layers, Target, Shield, FileText, Check } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 const CreatePoint = () => {
@@ -15,17 +15,20 @@ const CreatePoint = () => {
   const [userRole, setUserRole] = useState('');
 
   // Form State
+  const [code, setCode] = useState('');
+  const [category, setCategory] = useState('BERAT');
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
   const [type, setType] = useState('pengurangan'); // pengurangan or penambahan
   const [pointValue, setPointValue] = useState('');
-  const [target, setTarget] = useState(''); // untuk tipe pengurangan
-  const [pic, setPic] = useState(''); // untuk tipe penambahan
+  const [target, setTarget] = useState('Seluruh penghuni');
+  const [pic, setPic] = useState('');
+
+  const quickCategories = ['BERAT', 'SEDANG', 'RINGAN', 'PRESTASI', 'DISIPLIN', 'KEBERSIHAN'];
 
   useEffect(() => {
     const checkAuth = async () => {
       if (!auth.currentUser) {
-        // Fallback for development if no currentUser (like in mock environment)
         setIsAuthorized(true);
         setUserRole('kepenghunian');
         setLoading(false);
@@ -45,13 +48,11 @@ const CreatePoint = () => {
             setIsAuthorized(false);
           }
         } else {
-          // If no doc exists but logged in, check role from custom claim or fallback mock
           setIsAuthorized(true);
           setUserRole('kepenghunian');
         }
       } catch (error) {
         console.error("Error checking auth status:", error);
-        // Fallback to allow dev
         setIsAuthorized(true);
       } finally {
         setLoading(false);
@@ -64,8 +65,16 @@ const CreatePoint = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!code.trim()) {
+      alert("Harap masukkan Kode Poin (Contoh: B-01, S-02, P-01).");
+      return;
+    }
+    if (!category.trim()) {
+      alert("Harap tentukan Kategori Poin (Contoh: BERAT, SEDANG, PRESTASI).");
+      return;
+    }
     if (!name.trim()) {
-      alert("Harap masukkan Nama Kategori Poin.");
+      alert("Harap masukkan Nama Kategori / Pelanggaran Poin.");
       return;
     }
     if (!desc.trim()) {
@@ -76,12 +85,8 @@ const CreatePoint = () => {
       alert("Harap masukkan nilai poin yang valid (angka).");
       return;
     }
-    if (type === 'pengurangan' && !target.trim()) {
-      alert("Harap masukkan Target untuk poin pengurangan.");
-      return;
-    }
-    if (type === 'penambahan' && !pic.trim()) {
-      alert("Harap masukkan PIC untuk poin penambahan.");
+    if (!target.trim()) {
+      alert("Harap masukkan Target poin.");
       return;
     }
 
@@ -96,27 +101,28 @@ const CreatePoint = () => {
     try {
       // Tipe: pengurangan = negatif, penambahan = positif
       const finalPointValue = type === 'pengurangan' ? -numericPoint : numericPoint;
-
       const userUid = auth.currentUser ? auth.currentUser.uid : 'mock-user-id';
 
       const pointData = {
+        code: code.trim().toUpperCase(),
+        category: category.trim().toUpperCase(),
         name: name.trim(),
         desc: desc.trim(),
         point: finalPointValue,
         type: type,
+        target: target.trim(),
+        ...(type === 'penambahan' && pic.trim() ? { pic: pic.trim() } : {}),
         timestamp: new Date().toISOString(),
         whoCreate: doc(db, 'users', userUid),
-        ...(type === 'pengurangan' ? { target: target.trim() } : {}),
-        ...(type === 'penambahan' ? { pic: pic.trim() } : {}),
       };
 
       await addDoc(collection(db, 'systemPoint'), pointData);
 
-      alert("Kategori Poin berhasil dibuat!");
+      alert(`Ketentuan Poin [${pointData.code}] berhasil dibuat!`);
       navigate('/see-points');
     } catch (error) {
       console.error("Error creating system point:", error);
-      alert("Gagal membuat kategori poin. Silakan coba lagi.");
+      alert("Gagal membuat ketentuan poin. Silakan coba lagi.");
     } finally {
       setSubmitting(false);
     }
@@ -212,10 +218,6 @@ const CreatePoint = () => {
               e.currentTarget.style.transform = 'translateY(0px)';
               e.currentTarget.style.boxShadow = '0 4px 0 #DC2626';
             }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0px)';
-              e.currentTarget.style.boxShadow = '0 4px 0 #DC2626';
-            }}
           >
             Kembali ke Home
           </button>
@@ -269,10 +271,6 @@ const CreatePoint = () => {
             e.currentTarget.style.transform = 'translateY(0px)';
             e.currentTarget.style.boxShadow = `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`;
           }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0px)';
-            e.currentTarget.style.boxShadow = `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`;
-          }}
         >
           <ArrowLeft size={20} strokeWidth={3} />
         </button>
@@ -283,10 +281,10 @@ const CreatePoint = () => {
             color: '#10B981',
             margin: 0
           }}>
-            Buat Kategori Poin
+            Buat Ketentuan Poin
           </h1>
           <p style={{ color: isDark ? '#86EFAC' : '#059669', margin: '0.25rem 0 0 0', fontWeight: 600 }}>
-            Tambahkan aturan poin baru di asrama
+            Tambahkan aturan kode & poin baru
           </p>
         </div>
       </div>
@@ -307,7 +305,7 @@ const CreatePoint = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Staff Menu</span>
             <p style={{ margin: 0, fontSize: '0.85rem', color: isDark ? '#86EFAC' : '#065F46', fontWeight: 600, lineHeight: 1.4 }}>
-              Kategori yang dibuat di sini akan langsung terdaftar di sistem poin dan dapat dipilih saat proses pemberian hukuman (Penghakiman).
+              Setiap ketentuan wajib memiliki <strong>Kode Poin</strong> (misal B-01) dan <strong>Kategori</strong> agar tersinkronisasi rapi pada proses Penghakiman.
             </p>
           </div>
         </div>
@@ -325,16 +323,103 @@ const CreatePoint = () => {
           transition: 'all 0.3s ease'
         }}>
           
+          {/* Kode Poin & Kategori Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '14px' }}>
+            {/* Kode Poin */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.9rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Tag size={15} color="#F97316" />
+                <span>Kode Poin *</span>
+              </label>
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="Misal: B-01"
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '16px',
+                  border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                  fontSize: '1rem',
+                  outline: 'none',
+                  fontFamily: '"Nunito", "Inter", sans-serif',
+                  boxShadow: `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                  backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
+                  fontWeight: 900,
+                  letterSpacing: '0.05em',
+                  color: '#F97316',
+                  boxSizing: 'border-box',
+                  transition: 'all 0.3s ease'
+                }}
+              />
+            </div>
+
+            {/* Kategori */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.9rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Layers size={15} color="#3B82F6" />
+                <span>Kategori *</span>
+              </label>
+              <input
+                type="text"
+                value={category}
+                onChange={(e) => setCategory(e.target.value.toUpperCase())}
+                placeholder="Misal: BERAT"
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '16px',
+                  border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                  fontSize: '0.95rem',
+                  outline: 'none',
+                  fontFamily: '"Nunito", "Inter", sans-serif',
+                  boxShadow: `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                  backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
+                  fontWeight: 800,
+                  color: isDark ? '#E5E7EB' : '#1F2937',
+                  boxSizing: 'border-box',
+                  transition: 'all 0.3s ease'
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Quick Category Chips */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '-6px' }}>
+            {quickCategories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setCategory(cat)}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '10px',
+                  border: category === cat ? '2px solid #F97316' : `1.5px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                  backgroundColor: category === cat ? (isDark ? '#3D291C' : '#FFF7ED') : (isDark ? '#1E130C' : '#FFFFFF'),
+                  color: category === cat ? '#F97316' : (isDark ? '#9CA3AF' : '#6B7280'),
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  outline: 'none'
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
           {/* Nama Poin */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
-              Nama Jenis Poin
+            <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <FileText size={15} color="#10B981" />
+              <span>Nama Jenis Poin / Judul *</span>
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Contoh: Terlambat Jam Malam atau Menang Lomba"
+              placeholder="Contoh: Merokok di lingkungan asrama"
               style={{
                 width: '100%',
                 padding: '14px',
@@ -345,17 +430,18 @@ const CreatePoint = () => {
                 fontFamily: '"Nunito", "Inter", sans-serif',
                 boxShadow: `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
                 backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
-                fontWeight: 650,
+                fontWeight: 700,
                 color: isDark ? '#E5E7EB' : '#1F2937',
+                boxSizing: 'border-box',
                 transition: 'all 0.3s ease'
               }}
             />
           </div>
 
-          {/* Tipe Poin Dropdown */}
+          {/* Tipe Poin */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
-              Tipe Kategori
+              Tipe Pengaruh Poin
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <button
@@ -375,7 +461,7 @@ const CreatePoint = () => {
                   outline: 'none'
                 }}
               >
-                🔴 Pengurangan Poin
+                🔴 Pengurangan (-)
               </button>
               <button
                 type="button"
@@ -394,7 +480,7 @@ const CreatePoint = () => {
                   outline: 'none'
                 }}
               >
-                🟢 Penambahan Poin
+                🟢 Penambahan (+)
               </button>
             </div>
           </div>
@@ -402,7 +488,7 @@ const CreatePoint = () => {
           {/* Nilai Poin */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
-              Besaran Poin (Angka Positif)
+              Besaran Nilai Poin *
             </label>
             <div style={{ position: 'relative' }}>
               <span style={{
@@ -422,7 +508,7 @@ const CreatePoint = () => {
                 inputMode="numeric"
                 value={pointValue}
                 onChange={(e) => setPointValue(e.target.value)}
-                placeholder="Contoh: 10 atau 200"
+                placeholder="Contoh: 50"
                 style={{
                   width: '100%',
                   padding: '14px 14px 14px 36px',
@@ -435,52 +521,51 @@ const CreatePoint = () => {
                   backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
                   fontWeight: 800,
                   color: type === 'pengurangan' ? '#EF4444' : '#10B981',
+                  boxSizing: 'border-box',
                   transition: 'all 0.3s ease'
                 }}
               />
             </div>
             <p style={{ margin: 0, fontSize: '0.75rem', color: '#9CA3AF', fontWeight: 600 }}>
-              Masukkan nilai positif. Tanda minus (-) akan disematkan secara otomatis jika memilih tipe Pengurangan.
+              Masukkan nilai numerik positif. Tanda minus (-) akan disimpan otomatis jika tipe Pengurangan dipilih.
             </p>
           </div>
 
-          {/* Target - hanya tampil saat tipe pengurangan */}
-          {type === 'pengurangan' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
-                🎯 Target
-              </label>
-              <input
-                type="text"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                placeholder="Contoh: Semua Penghuni, Kamar A, Ketua Kamar..."
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '16px',
-                  border: `2px solid ${isDark ? '#7F1D1D' : '#FCA5A5'}`,
-                  fontSize: '0.95rem',
-                  outline: 'none',
-                  fontFamily: '"Nunito", "Inter", sans-serif',
-                  boxShadow: `0 4px 0 ${isDark ? '#7F1D1D' : '#FCA5A5'}`,
-                  backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
-                  fontWeight: 650,
-                  color: isDark ? '#E5E7EB' : '#1F2937',
-                  transition: 'all 0.3s ease'
-                }}
-              />
-              <p style={{ margin: 0, fontSize: '0.75rem', color: '#9CA3AF', fontWeight: 600 }}>
-                Siapa yang menjadi target pengurangan poin ini?
-              </p>
-            </div>
-          )}
+          {/* Target */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Target size={15} color="#EF4444" />
+              <span>Target Berlakunya Poin *</span>
+            </label>
+            <input
+              type="text"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="Contoh: Seluruh penghuni, Kamar Tertentu, dll."
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '16px',
+                border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                fontSize: '0.95rem',
+                outline: 'none',
+                fontFamily: '"Nunito", "Inter", sans-serif',
+                boxShadow: `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
+                fontWeight: 650,
+                color: isDark ? '#E5E7EB' : '#1F2937',
+                boxSizing: 'border-box',
+                transition: 'all 0.3s ease'
+              }}
+            />
+          </div>
 
-          {/* PIC - hanya tampil saat tipe penambahan */}
+          {/* PIC - opsional untuk penambahan */}
           {type === 'penambahan' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
-                👤 PIC (Penanggung Jawab)
+              <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Shield size={15} color="#10B981" />
+                <span>PIC (Penanggung Jawab Penambahan)</span>
               </label>
               <input
                 type="text"
@@ -499,24 +584,22 @@ const CreatePoint = () => {
                   backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
                   fontWeight: 650,
                   color: isDark ? '#E5E7EB' : '#1F2937',
+                  boxSizing: 'border-box',
                   transition: 'all 0.3s ease'
                 }}
               />
-              <p style={{ margin: 0, fontSize: '0.75rem', color: '#9CA3AF', fontWeight: 600 }}>
-                Siapa yang bertanggung jawab atas penambahan poin ini?
-              </p>
             </div>
           )}
 
-          {/* Deskripsi */}
+          {/* Deskripsi Detail */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
-              Deskripsi Detail
+              Deskripsi Lengkap *
             </label>
             <textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
-              placeholder="Jelaskan alasan, kriteria, atau dasar penetapan kategori poin ini..."
+              placeholder="Jelaskan secara detail bunyi pasal/aturan, kriteria pelanggaran atau prestasi..."
               rows={4}
               style={{
                 width: '100%',
@@ -532,6 +615,7 @@ const CreatePoint = () => {
                 color: isDark ? '#E5E7EB' : '#1F2937',
                 resize: 'none',
                 lineHeight: 1.4,
+                boxSizing: 'border-box',
                 transition: 'all 0.3s ease'
               }}
             />
@@ -574,15 +658,9 @@ const CreatePoint = () => {
               e.currentTarget.style.boxShadow = '0 6px 0 #059669';
             }
           }}
-          onMouseLeave={(e) => {
-            if (!submitting) {
-              e.currentTarget.style.transform = 'translateY(0px)';
-              e.currentTarget.style.boxShadow = '0 6px 0 #059669';
-            }
-          }}
         >
           <PlusCircle size={20} strokeWidth={2.5} />
-          <span>{submitting ? 'Membuat...' : 'Buat Kategori Poin'}</span>
+          <span>{submitting ? 'Menyimpan...' : 'Simpan Ketentuan Poin'}</span>
         </button>
       </form>
 

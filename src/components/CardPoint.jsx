@@ -75,7 +75,7 @@ const CardPoint = ({ userData, theme }) => {
             }}>
               {userData?.point ?? 0}
             </span>
-            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: labelColor }}>/ 110 Poin</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: labelColor }}>/ 115 Poin</span>
           </div>
 
           {/* Badge kategori */}
@@ -107,7 +107,7 @@ const CardPoint = ({ userData, theme }) => {
           }}>
             <div style={{
               height: '100%',
-              width: `${Math.min(100, Math.max(0, ((userData?.point ?? 0) / 110) * 100))}%`,
+              width: `${Math.min(100, Math.max(0, ((userData?.point ?? 0) / 115) * 100))}%`,
               backgroundColor: getPointColor(userData?.point ?? 0),
               borderRadius: '8px',
               transition: 'width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
@@ -242,7 +242,7 @@ const CardPoint = ({ userData, theme }) => {
 };
 
 // ─── Helper: warna berdasarkan range poin ─────────────────────────────────
-// Hijau : 100 – 110
+// Hijau : 100 – 115
 // Oranye: 75  – 99
 // Merah : 0   – 74
 const getPointColor = (point) => {

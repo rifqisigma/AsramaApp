@@ -47,18 +47,25 @@ const HistoryActivity = () => {
 
       try {
         // Parallel queries to all relevant collections
-        const [usersSnap, piketSnap, jamalSnap, spaSnap, historySnap] = await Promise.all([
+        const [usersSnap, piketSnap, jamalSnap, spaSnap, historySnap, systemPointSnap] = await Promise.all([
           getDocs(collection(db, 'users')),
           getDocs(collection(db, 'piket')),
           getDocs(collection(db, 'jamal')),
           getDocs(collection(db, 'Spa')),
-          getDocs(collection(db, 'historyPoint'))
+          getDocs(collection(db, 'historyPoint')),
+          getDocs(collection(db, 'systemPoint'))
         ]);
 
         // Build user map for fast local lookup
         const usersMap = {};
         usersSnap.forEach(d => {
           usersMap[d.id] = { id: d.id, ...d.data() };
+        });
+
+        // Build system points map for fast lookup
+        const systemPointsMap = {};
+        systemPointSnap.forEach(d => {
+          systemPointsMap[d.id] = { id: d.id, ...d.data() };
         });
 
         const normalizedList = [];
@@ -126,24 +133,28 @@ const HistoryActivity = () => {
 
           if (data.tipe === 'form' && (authorId === currentUid || data.author?.path?.includes(currentUid))) {
             const t = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp || 0);
+            const bulanFormatted = Array.isArray(data.bulan) ? (data.bulan.length > 0 ? data.bulan.join(', ') : '-') : (data.bulan || '-');
+            const tahunText = data.tahun ? ` (${data.tahun})` : '';
+
             normalizedList.push({
               id: d.id,
               type: 'spa',
-              title: `SPA Bulan ${data.bulan || '-'}`,
+              title: `SPA: ${bulanFormatted}${tahunText}`,
               subtitle: `Pembayaran ${data.statusBayar === 'lunas' ? 'Lunas' : 'Cicil'}`,
               badge: data.verification ? 'Diverifikasi Bendahara' : 'Proses Verifikasi',
               statusType: data.verification ? 'success' : 'pending',
               timestamp: t,
               bukti: data.bukti || null,
               meta: {
-                bulan: data.bulan || '-',
+                bulan: bulanFormatted,
+                tahun: data.tahun || '-',
                 statusBayar: data.statusBayar || 'lunas'
               }
             });
           }
         });
 
-        // 4. POINT Normalization & Filtering
+        // 4. POINT Normalization & Filtering (With Code & Category Support)
         historySnap.forEach(d => {
           const data = d.data();
           const userrefId = data.userref?.id || (typeof data.userref === 'string' ? data.userref : data.userref?.path?.split('/').pop() || '');
@@ -151,17 +162,43 @@ const HistoryActivity = () => {
           if (userrefId === currentUid) {
             const t = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp || 0);
             const isNeg = (data.point || 0) < 0;
+
+            let pointrefId = '';
+            if (data.pointref) {
+              if (typeof data.pointref === 'string') {
+                pointrefId = data.pointref.startsWith('/systemPoint/') ? data.pointref.split('/')[2] : data.pointref.replace('systemPoint/', '');
+              } else {
+                pointrefId = data.pointref.id || data.pointref.path?.split('/').pop() || '';
+              }
+            }
+            const linkedPoint = systemPointsMap[pointrefId] || {};
+
+            const code = data.code || linkedPoint.code || '';
+            const category = data.category || linkedPoint.category || '';
+            const name = data.name || linkedPoint.name || 'Transaksi Poin';
+            const desc = data.desc || linkedPoint.desc || '';
+            const target = data.target || linkedPoint.target || 'Seluruh penghuni';
+
+            const titleText = code ? `[${code}] ${name}` : name;
+            const subtitleText = isNeg 
+              ? `Pelanggaran (${category || 'Umum'}): ${data.point} Poin` 
+              : `Prestasi (${category || 'Umum'}): +${data.point} Poin`;
+
             normalizedList.push({
               id: d.id,
               type: 'point',
-              title: data.name || 'Transaksi Poin',
-              subtitle: isNeg ? `Pelanggaran: Mengurangi ${data.point} Poin` : `Prestasi: Menambah +${data.point} Poin`,
-              badge: isNeg ? 'Pengurangan Poin ⚠️' : 'Tambahan Poin 🏆',
+              title: titleText,
+              subtitle: subtitleText,
+              badge: category ? `${category} (${isNeg ? data.point : `+${data.point}`})` : (isNeg ? 'Pengurangan Poin ⚠️' : 'Tambahan Poin 🏆'),
               statusType: isNeg ? 'danger' : 'success',
               timestamp: t,
               points: data.point,
               meta: {
-                name: data.name || '-'
+                code,
+                category,
+                name,
+                desc,
+                target
               }
             });
           }
@@ -386,16 +423,16 @@ const HistoryActivity = () => {
             let iconBg = '#9CA3AF';
             if (item.type === 'piket') {
               itemIcon = <Brush size={18} strokeWidth={2.5} />;
-              iconBg = '#22C55E'; // Green
+              iconBg = '#22C55E';
             } else if (item.type === 'jamal') {
               itemIcon = <Moon size={18} strokeWidth={2.5} />;
-              iconBg = '#8B5CF6'; // Purple
+              iconBg = '#8B5CF6';
             } else if (item.type === 'spa') {
               itemIcon = <DollarSign size={18} strokeWidth={2.5} />;
-              iconBg = '#3B82F6'; // Blue
+              iconBg = '#3B82F6';
             } else if (item.type === 'point') {
               itemIcon = <Award size={18} strokeWidth={2.5} />;
-              iconBg = '#EAB308'; // Gold
+              iconBg = item.points < 0 ? '#EF4444' : '#EAB308';
             }
 
             // Colors setup
@@ -507,7 +544,7 @@ const HistoryActivity = () => {
                   {/* Expanded Accordion Area with details */}
                   {isExpanded && (
                     <div 
-                      onClick={e => e.stopPropagation()} // Prevent closing card when tapping inside details
+                      onClick={e => e.stopPropagation()}
                       style={{
                         marginTop: '12px',
                         paddingTop: '12px',
@@ -523,7 +560,7 @@ const HistoryActivity = () => {
                           Detail Transaksi
                         </span>
                         
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.82rem', fontWeight: 700, color: isDark ? '#E5E7EB' : '#4B5563' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem', fontWeight: 700, color: isDark ? '#E5E7EB' : '#4B5563' }}>
                           {item.type === 'piket' && (
                             <>
                               <div>📍 Tempat Piket: <strong style={{ color: '#F97316' }}>{item.meta.place}</strong></div>
@@ -547,8 +584,20 @@ const HistoryActivity = () => {
 
                           {item.type === 'point' && (
                             <>
-                              <div>📝 Deskripsi: <strong style={{ color: '#EAB308' }}>{item.meta.name}</strong></div>
-                              <div>⚖️ Perubahan Nilai: <strong>{item.points < 0 ? `${item.points}` : `+${item.points}`} Poin</strong></div>
+                              {item.meta.code && (
+                                <div>🏷️ Kode Poin: <strong style={{ color: '#F97316', backgroundColor: isDark ? '#3D291C' : '#FFF7ED', padding: '2px 8px', borderRadius: '6px', border: `1px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}` }}>{item.meta.code}</strong></div>
+                              )}
+                              {item.meta.category && (
+                                <div>📌 Kategori: <strong style={{ color: item.points < 0 ? '#EF4444' : '#10B981' }}>{item.meta.category}</strong></div>
+                              )}
+                              <div>📝 Nama Aturan: <strong>{item.meta.name}</strong></div>
+                              {item.meta.desc && (
+                                <div style={{ lineHeight: 1.4 }}>📜 Deskripsi: <span style={{ fontWeight: 600, color: isDark ? '#D1D5DB' : '#6B7280' }}>{item.meta.desc}</span></div>
+                              )}
+                              {item.meta.target && (
+                                <div>🎯 Target: <strong>{item.meta.target}</strong></div>
+                              )}
+                              <div>⚖️ Perubahan Nilai: <strong style={{ color: item.points < 0 ? '#EF4444' : '#10B981' }}>{item.points < 0 ? `${item.points}` : `+${item.points}`} Poin</strong></div>
                             </>
                           )}
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
-import { doc, getDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { ArrowLeft, Send } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
@@ -63,6 +63,8 @@ const CatatanPiket = () => {
 
       // Ekstrak userPiket ID secara aman
       let userPiketId = null;
+      console.log('[CatatanPiket] piketData.userPiket raw:', piketData.userPiket);
+      console.log('[CatatanPiket] typeof piketData.userPiket:', typeof piketData.userPiket);
       if (piketData.userPiket) {
         if (typeof piketData.userPiket === 'string') {
           userPiketId = piketData.userPiket;
@@ -73,9 +75,10 @@ const CatatanPiket = () => {
           userPiketId = parts[parts.length - 1];
         }
       }
+      console.log('[CatatanPiket] Extracted userPiketId:', userPiketId);
 
       // Simpan catatan ke Firestore — ini akan mentrigger Cloud Function untuk kirim notif
-      await addDoc(collection(db, 'catatanPiket'), {
+      const catatanDoc = await addDoc(collection(db, 'catatanPiket'), {
         reportId: reportId,
         catatan: catatan.trim(),
         createdBy: currentUser.uid,
@@ -83,9 +86,7 @@ const CatatanPiket = () => {
         reportDate: reportDateRaw,
         userPiket: userPiketId || null
       });
-
-      // Hapus dokumen piket karena ditolak
-      await deleteDoc(piketRef);
+      console.log('[CatatanPiket] Catatan saved with ID:', catatanDoc.id, 'userPiket:', userPiketId);
 
       setSent(true);
     } catch (err) {

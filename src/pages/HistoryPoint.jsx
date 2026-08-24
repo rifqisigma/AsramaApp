@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Clock, User, Shield } from 'lucide-react';
+import { ArrowLeft, Search, Clock, User, Shield, Tag, Layers } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 const HistoryPoint = () => {
@@ -30,11 +30,20 @@ const HistoryPoint = () => {
           return;
         }
 
-        const snap = await getDocs(collection(db, 'historyPoint'));
+        const [snap, systemSnap] = await Promise.all([
+          getDocs(collection(db, 'historyPoint')),
+          getDocs(collection(db, 'systemPoint'))
+        ]);
+
+        const systemMap = {};
+        systemSnap.forEach(d => {
+          systemMap[d.id] = { id: d.id, ...d.data() };
+        });
+
         const raw = [];
         snap.forEach(d => raw.push({ id: d.id, ...d.data() }));
 
-        // Resolve userref → username untuk setiap record
+        // Resolve userref → username & systemPoint metadata
         const resolved = await Promise.all(
           raw.map(async (h) => {
             let username = 'Unknown';
@@ -47,7 +56,30 @@ const HistoryPoint = () => {
                 }
               }
             } catch (_) {}
-            return { ...h, resolvedUsername: username };
+
+            let pointrefId = '';
+            if (h.pointref) {
+              if (typeof h.pointref === 'string') {
+                pointrefId = h.pointref.startsWith('/systemPoint/') ? h.pointref.split('/')[2] : h.pointref.replace('systemPoint/', '');
+              } else {
+                pointrefId = h.pointref.id || h.pointref.path?.split('/').pop() || '';
+              }
+            }
+            const linkedPoint = systemMap[pointrefId] || {};
+
+            const code = h.code || linkedPoint.code || '';
+            const category = h.category || linkedPoint.category || '';
+            const desc = h.desc || linkedPoint.desc || '';
+            const target = h.target || linkedPoint.target || '';
+
+            return {
+              ...h,
+              resolvedUsername: username,
+              code,
+              category,
+              desc,
+              target
+            };
           })
         );
 
@@ -72,12 +104,23 @@ const HistoryPoint = () => {
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-    });
+    }) + ' WIB';
+  };
+
+  const getCategoryColor = (cat) => {
+    const c = (cat || '').toUpperCase();
+    if (c === 'BERAT') return { bg: isDark ? '#4C1D1D' : '#FEE2E2', border: '#EF4444', text: '#EF4444' };
+    if (c === 'SEDANG') return { bg: isDark ? '#452A14' : '#FFEDD5', border: '#F97316', text: '#EA580C' };
+    if (c === 'RINGAN') return { bg: isDark ? '#3D2F14' : '#FEF9C3', border: '#EAB308', text: '#CA8A04' };
+    if (c === 'PRESTASI') return { bg: isDark ? '#143823' : '#DCFCE7', border: '#22C55E', text: '#16A34A' };
+    return { bg: isDark ? '#2D1D13' : '#F3F4F6', border: '#9CA3AF', text: isDark ? '#FED7AA' : '#4B5563' };
   };
 
   const filtered = histories.filter(h => {
-    const q = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
     return (
+      (h.code || '').toLowerCase().includes(q) ||
+      (h.category || '').toLowerCase().includes(q) ||
       (h.name || '').toLowerCase().includes(q) ||
       (h.resolvedUsername || '').toLowerCase().includes(q)
     );
@@ -163,7 +206,7 @@ const HistoryPoint = () => {
         transition: 'background-color 0.3s ease'
       }}
     >
-      {/* ─── Header ─── */}
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '1.5rem' }}>
         <button
           onClick={() => navigate(-1)}
@@ -183,7 +226,6 @@ const HistoryPoint = () => {
           }}
           onMouseDown={e => { e.currentTarget.style.transform = 'translateY(2px)'; e.currentTarget.style.boxShadow = isDark ? '0 2px 0 #4A2E1E' : '0 2px 0 #FFEDD5'; }}
           onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FFEDD5'; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FFEDD5'; }}
         >
           <ArrowLeft size={20} strokeWidth={3} />
         </button>
@@ -197,19 +239,19 @@ const HistoryPoint = () => {
         </div>
       </div>
 
-      {/* ─── Search ─── */}
+      {/* Search */}
       <div style={{ position: 'relative', marginBottom: '20px' }}>
         <input
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Cari nama pelanggaran atau penghuni..."
+          placeholder="Cari kode (B-01), kategori, atau nama..."
           style={{
             width: '100%',
             padding: '14px 14px 14px 44px',
             borderRadius: '16px',
             border: isDark ? '2px solid #4A2E1E' : '2px solid #FFEDD5',
-            fontSize: '1rem',
+            fontSize: '0.95rem',
             outline: 'none',
             fontFamily: '"Nunito", "Inter", sans-serif',
             boxShadow: isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FFEDD5',
@@ -227,7 +269,7 @@ const HistoryPoint = () => {
         />
       </div>
 
-      {/* ─── List ─── */}
+      {/* List */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '4rem 0', color: '#F97316', fontWeight: 800 }}>
           <div style={{ fontSize: '2rem', marginBottom: '12px' }}>⏳</div>
@@ -254,14 +296,15 @@ const HistoryPoint = () => {
             const bgColor = isNeg ? (isDark ? '#3C1C1C' : '#FEF2F2') : (isDark ? '#1C3D27' : '#F0FDF4');
             const borderColor = isNeg ? (isDark ? '#5C2222' : '#FCA5A5') : (isDark ? '#1C3D27' : '#86EFAC');
             const shadowColor = isNeg ? (isDark ? '#5C2222' : '#FCA5A5') : (isDark ? '#1C3D27' : '#86EFAC');
+            const catStyle = getCategoryColor(h.category);
 
             return (
               <div
                 key={h.id}
                 style={{
                   backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
-                  borderRadius: '20px',
-                  padding: '16px 20px',
+                  borderRadius: '22px',
+                  padding: '16px 18px',
                   border: `2px solid ${borderColor}`,
                   boxShadow: `0 6px 0 ${shadowColor}`,
                   display: 'flex',
@@ -272,33 +315,63 @@ const HistoryPoint = () => {
                 }}
               >
                 {/* Left info */}
-                <div style={{ flex: 1, overflow: 'hidden' }}>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {/* Badges: Kode & Kategori */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' }}>
+                    {h.code && (
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 900,
+                        padding: '2px 6px',
+                        borderRadius: '6px',
+                        backgroundColor: '#F97316',
+                        color: 'white',
+                        letterSpacing: '0.04em'
+                      }}>
+                        🏷️ {h.code}
+                      </span>
+                    )}
+
+                    {h.category && (
+                      <span style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        padding: '2px 6px',
+                        borderRadius: '6px',
+                        backgroundColor: catStyle.bg,
+                        color: catStyle.text,
+                        border: `1px solid ${catStyle.border}`
+                      }}>
+                        {h.category}
+                      </span>
+                    )}
+                  </div>
+
                   {/* Nama pelanggaran/prestasi */}
                   <h3 style={{
                     margin: 0,
-                    fontSize: '1rem',
-                    fontWeight: 800,
+                    fontSize: '0.98rem',
+                    fontWeight: 850,
                     color: isDark ? '#FFFFFF' : '#1F2937',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
+                    lineHeight: 1.3,
                     transition: 'color 0.3s'
                   }}>
                     {h.name || '-'}
                   </h3>
 
                   {/* Kepada user */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '5px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
                     <User size={13} color="#9CA3AF" />
                     <span style={{ fontSize: '0.78rem', fontWeight: 700, color: isDark ? '#D1D5DB' : '#6B7280', transition: 'color 0.3s' }}>
-                      kepada {h.resolvedUsername}
+                      kepada <strong style={{ color: '#F97316' }}>{h.resolvedUsername}</strong>
                     </span>
                   </div>
 
                   {/* Timestamp */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
-                    <Clock size={13} color="#9CA3AF" />
-                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9CA3AF' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Clock size={12} color="#9CA3AF" />
+                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#9CA3AF' }}>
                       {formatDate(h.timestamp)}
                     </span>
                   </div>
@@ -306,7 +379,7 @@ const HistoryPoint = () => {
 
                 {/* Right: point badge */}
                 <div style={{
-                  padding: '10px 16px',
+                  padding: '8px 14px',
                   borderRadius: '14px',
                   backgroundColor: bgColor,
                   border: `2px solid ${borderColor}`,
@@ -314,7 +387,6 @@ const HistoryPoint = () => {
                   fontWeight: 900,
                   fontSize: '1.15rem',
                   flexShrink: 0,
-                  minWidth: '60px',
                   textAlign: 'center',
                 }}>
                   {isNeg ? '' : '+'}{h.point}

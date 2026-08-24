@@ -140,10 +140,11 @@ const AcceptingSpa = () => {
 
       // Log ke Google Sheets (async, non-blocking)
       if (auth.currentUser && payment) {
+        const bulanFormatted = Array.isArray(payment.bulan) ? payment.bulan.join(', ') : (payment.bulan || '-');
         const formattedData = formatVerificationData('spa', {
-          kategori: payment.kategori || '-',
-          deskripsi: payment.deskripsi || '-',
-          pengusulName: payment.authorName || '-',
+          kategori: `SPA ${bulanFormatted}`,
+          deskripsi: `Pembayaran SPA Bulan ${bulanFormatted} (${payment.statusBayar === 'lunas' ? 'Lunas' : 'Cicil'})`,
+          pengusulName: payment.authorInfo?.username || payment.authorName || '-',
           statusPersetujuan: 'Disetujui',
           timestamp: payment.tanggalPelaporan || new Date().toISOString(),
           id: payId
@@ -182,6 +183,15 @@ const AcceptingSpa = () => {
     } catch (e) {
       return String(ts);
     }
+  };
+
+  const formatBulanDisplay = (bulanData) => {
+    if (!bulanData) return '-';
+    if (Array.isArray(bulanData)) {
+      if (bulanData.length === 0) return '-';
+      return bulanData.join(', ');
+    }
+    return String(bulanData);
   };
 
   if (loading) {
@@ -403,12 +413,12 @@ const AcceptingSpa = () => {
                 gap: '12px'
               }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0, flex: 1 }}>
                 <span style={{ fontSize: '1.05rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {payment.authorInfo.username}
                 </span>
                 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '0.7rem',
                     fontWeight: 800,
@@ -433,8 +443,31 @@ const AcceptingSpa = () => {
                     {payment.statusBayar === 'lunas' ? 'Lunas' : 'Cicil'}
                   </span>
 
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#9CA3AF' }}>
-                    {payment.bulan}
+                  {payment.tahun && (
+                    <span style={{
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      backgroundColor: isDark ? '#2D1D13' : '#F3F4F6',
+                      color: isDark ? '#FED7AA' : '#4B5563',
+                      border: `1px solid ${isDark ? '#4A2E1E' : '#D1D5DB'}`
+                    }}>
+                      {payment.tahun}
+                    </span>
+                  )}
+                </div>
+
+                {/* Months Chips / Text */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                  <Calendar size={13} color="#F97316" style={{ flexShrink: 0 }} />
+                  <span style={{
+                    fontSize: '0.78rem',
+                    fontWeight: 750,
+                    color: isDark ? '#FED7AA' : '#4B5563',
+                    lineHeight: 1.3
+                  }}>
+                    {formatBulanDisplay(payment.bulan)}
                   </span>
                 </div>
               </div>
@@ -501,13 +534,15 @@ const AcceptingSpa = () => {
             flexDirection: 'column',
             gap: '16px',
             position: 'relative',
+            maxHeight: '90vh',
+            overflowY: 'auto',
             boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
             animation: 'scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
             border: `2px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`
           }}>
             
             <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937', textAlign: 'center' }}>
-              Bukti Transaksi
+              Bukti Transaksi SPA
             </h3>
 
             {/* Frame Bukti Image */}
@@ -562,15 +597,6 @@ const AcceptingSpa = () => {
                 </span>
               </div>
 
-              {/* Bulan Target */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <span style={{ fontSize: '0.65rem', color: '#9CA3AF', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bulan Target</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
-                  <Calendar size={14} color="#F97316" />
-                  <span>{selectedPayment.bulan}</span>
-                </div>
-              </div>
-
               {/* Status */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <span style={{ fontSize: '0.65rem', color: '#9CA3AF', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status Bayar</span>
@@ -579,6 +605,53 @@ const AcceptingSpa = () => {
                   <span style={{ textTransform: 'capitalize' }}>
                     {selectedPayment.statusBayar === 'lunas' ? 'Lunas' : 'Cicil / Nyicil'}
                   </span>
+                </div>
+              </div>
+
+              {/* Tahun */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '0.65rem', color: '#9CA3AF', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tahun</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
+                  {selectedPayment.tahun || '-'}
+                </span>
+              </div>
+
+              {/* Bulan Target (Multiple choice render as badges) */}
+              <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontSize: '0.65rem', color: '#9CA3AF', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Bulan Target {Array.isArray(selectedPayment.bulan) ? `(${selectedPayment.bulan.length} Bulan)` : ''}
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {Array.isArray(selectedPayment.bulan) ? (
+                    selectedPayment.bulan.map((b, idx) => (
+                      <span key={idx} style={{
+                        fontSize: '0.78rem',
+                        fontWeight: 850,
+                        backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                        color: '#F97316',
+                        border: `1.5px solid ${isDark ? '#4A2E1E' : '#FED7AA'}`,
+                        borderRadius: '10px',
+                        padding: '3px 10px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        📅 {b}
+                      </span>
+                    ))
+                  ) : (
+                    <span style={{
+                      fontSize: '0.78rem',
+                      fontWeight: 850,
+                      backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                      color: '#F97316',
+                      border: `1.5px solid ${isDark ? '#4A2E1E' : '#FED7AA'}`,
+                      borderRadius: '10px',
+                      padding: '3px 10px'
+                    }}>
+                      📅 {selectedPayment.bulan || '-'}
+                    </span>
+                  )}
                 </div>
               </div>
 

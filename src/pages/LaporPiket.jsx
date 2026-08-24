@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { auth, db, storage } from '../firebase';
 import { getCookie, setCookie, getWeeklyResetTime } from '../utils/cookie';
 import { collection, getDocs, doc, addDoc, getDoc, query, where } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { ArrowLeft, Upload, CheckCircle, Search, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Upload, CheckCircle, Search, ExternalLink, Loader } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
@@ -44,9 +44,14 @@ const LaporPiket = () => {
   const [selectedLaporToUser, setSelectedLaporToUser] = useState(null);
   const [searchLaporStatus, setSearchLaporStatus] = useState('');
 
-  // Files
-  const [files, setFiles] = useState([]);
-  const [uploadProgress, setUploadProgress] = useState({});
+  // Files — auto-upload on select
+  // Each entry: { file, name, size, status: 'uploading'|'done'|'error', progress: 0-100, url: string|null }
+  const [fileEntries, setFileEntries] = useState([]);
+  const fileInputRef = useRef(null);
+
+  // Derived: true if any file is still uploading
+  const isUploading = fileEntries.some(f => f.status === 'uploading');
+  const allUploaded = fileEntries.length > 0 && fileEntries.every(f => f.status === 'done');
 
   const searchLaporTo = async () => {
     if (!searchQuery.trim()) return;
@@ -80,13 +85,57 @@ const LaporPiket = () => {
     }
   };
 
-  const handleFileSelect = (e) => {
+  // Auto-upload each file immediately upon selection
+  const handleFileSelect = async (e) => {
     const selectedFiles = Array.from(e.target.files);
-    setFiles(prev => [...prev, ...selectedFiles]);
+    if (selectedFiles.length === 0) return;
+
+    // Get username for filename
+    let myUsername = auth.currentUser?.uid || 'unknown';
+    try {
+      const myUserSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      if (myUserSnap.exists()) myUsername = myUserSnap.data().username || myUsername;
+    } catch (_) {}
+
+    for (const file of selectedFiles) {
+      const entryId = `${file.name}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+      const newEntry = { id: entryId, file, name: file.name, size: file.size, status: 'uploading', progress: 0, url: null };
+
+      setFileEntries(prev => [...prev, newEntry]);
+
+      // Start upload immediately
+      const extension = file.name.split('.').pop();
+      const customFileName = `${myUsername}_piket_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${extension}`;
+      const fileRef = ref(storage, `piket/${customFileName}`);
+      const uploadTask = uploadBytesResumable(fileRef, file);
+
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+          setFileEntries(prev => prev.map(f => f.id === entryId ? { ...f, progress } : f));
+        },
+        (error) => {
+          console.error('Upload error:', error);
+          setFileEntries(prev => prev.map(f => f.id === entryId ? { ...f, status: 'error' } : f));
+        },
+        async () => {
+          try {
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            setFileEntries(prev => prev.map(f => f.id === entryId ? { ...f, status: 'done', progress: 100, url } : f));
+          } catch (err) {
+            setFileEntries(prev => prev.map(f => f.id === entryId ? { ...f, status: 'error' } : f));
+          }
+        }
+      );
+    }
+
+    // Reset file input so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const removeFile = (index) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
+  const removeFile = (entryId) => {
+    setFileEntries(prev => prev.filter(f => f.id !== entryId));
   };
 
   const handleSubmit = async (e) => {
@@ -97,8 +146,19 @@ const LaporPiket = () => {
       return;
     }
 
-    if (files.length === 0) {
+    if (fileEntries.length === 0) {
       alert('Harap unggah minimal 1 bukti foto/video.');
+      return;
+    }
+
+    const failedFiles = fileEntries.filter(f => f.status === 'error');
+    if (failedFiles.length > 0) {
+      alert(`Ada ${failedFiles.length} file yang gagal diupload. Hapus file yang gagal dan coba lagi.`);
+      return;
+    }
+
+    if (isUploading || !allUploaded) {
+      alert('Upload file masih berlangsung. Harap tunggu hingga semua file selesai diupload.');
       return;
     }
 
@@ -125,42 +185,16 @@ const LaporPiket = () => {
     setLoading(true);
 
     try {
-      // Dapatkan username user yang login
-      const myUserSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
-      const myUsername = myUserSnap.exists() ? myUserSnap.data().username : auth.currentUser.uid;
+      // Collect all uploaded URLs — final safety check
+      const uploadedUrls = fileEntries.filter(f => f.status === 'done' && f.url).map(f => f.url);
 
-      // Bersihkan spasi berlebih
-      const cleanPlace = place.trim().replace(/\s+/g, '-');
-      const cleanLaporTo = selectedLaporToUser.username.trim().replace(/\s+/g, '-');
-
-      // 1. Upload Files
-      const uploadedUrls = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const extension = file.name.split('.').pop();
-        const customFileName = `${myUsername}_${cleanPlace}_${Date.now()}_${cleanLaporTo}.${extension}`;
-
-        const fileRef = ref(storage, `piket/${customFileName}`);
-        const uploadTask = uploadBytesResumable(fileRef, file);
-
-        await new Promise((resolve, reject) => {
-          uploadTask.on(
-            'state_changed',
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(prev => ({ ...prev, [file.name]: progress }));
-            },
-            (error) => reject(error),
-            async () => {
-              const url = await getDownloadURL(uploadTask.snapshot.ref);
-              uploadedUrls.push(url);
-              resolve();
-            }
-          );
-        });
+      if (uploadedUrls.length !== fileEntries.length) {
+        alert('Beberapa file belum selesai diupload atau gagal. Harap tunggu atau hapus file yang bermasalah.');
+        setLoading(false);
+        return;
       }
 
-      // 2. Simpan ke Firestore
+      // Simpan ke Firestore
       const piketData = {
         buktiLink: uploadedUrls,
         jenisKegiatan: 'piket',
@@ -173,7 +207,7 @@ const LaporPiket = () => {
 
       await addDoc(collection(db, 'piket'), piketData);
 
-      // 3. Update rules cookie
+      // Update rules cookie
       const updatedTimestamps = [...reportTimestamps, now];
       rules[targetId] = updatedTimestamps;
       const resetTime = getWeeklyResetTime();
@@ -479,8 +513,29 @@ const LaporPiket = () => {
             boxShadow: isDark ? '0 4px 6px rgba(0,0,0,0.4)' : '0 4px 6px rgba(0,0,0,0.05)',
             transition: 'all 0.3s ease'
           }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', color: isDark ? '#FFFFFF' : '#1C1C1E', fontWeight: 700 }}>3. Upload Bukti Piket</h3>
-            <p style={{ color: isDark ? '#FED7AA' : '#6B7280', fontSize: '0.85rem', marginBottom: '16px' }}>Unggah foto atau video hasil piket Anda.</p>
+            <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', color: isDark ? '#FFFFFF' : '#1C1C1E', fontWeight: 700 }}>3. Upload Bukti Piket</h3>
+            <p style={{ color: isDark ? '#FED7AA' : '#6B7280', fontSize: '0.85rem', marginBottom: '16px' }}>
+              Unggah foto atau video hasil piket Anda. File langsung di-upload saat dipilih.
+            </p>
+
+            {isUploading && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 14px',
+                backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                borderRadius: '12px',
+                marginBottom: '12px',
+                color: '#F97316',
+                fontSize: '0.85rem',
+                fontWeight: 700
+              }}>
+                <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                <span>Sedang mengupload file... Harap tunggu sebelum submit.</span>
+              </div>
+            )}
 
             <label style={{
               display: 'flex',
@@ -498,6 +553,7 @@ const LaporPiket = () => {
               <Upload size={32} color="#9CA3AF" style={{ marginBottom: '12px' }} />
               <span style={{ fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280' }}>Tambah File</span>
               <input
+                ref={fileInputRef}
                 type="file"
                 accept="image/*,video/*"
                 multiple
@@ -506,19 +562,23 @@ const LaporPiket = () => {
               />
             </label>
 
-            {files.length > 0 && (
+            {fileEntries.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {files.map((f, idx) => {
-                  const isVideo = f.type.startsWith('video/');
-                  const objectUrl = URL.createObjectURL(f);
+                {fileEntries.map((entry) => {
+                  const isVideo = entry.file?.type?.startsWith('video/');
+                  const objectUrl = entry.file ? URL.createObjectURL(entry.file) : '';
+                  const isDone = entry.status === 'done';
+                  const isError = entry.status === 'error';
+                  const isFileUploading = entry.status === 'uploading';
+
                   return (
-                    <div key={idx} style={{
+                    <div key={entry.id} style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '12px',
                       padding: '12px',
                       backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
-                      border: isDark ? '1px solid #4A2E1E' : '1px solid #E5E7EB',
+                      border: isError ? '2px solid #FCA5A5' : isDone ? '2px solid #86EFAC' : (isDark ? '1px solid #4A2E1E' : '1px solid #E5E7EB'),
                       borderRadius: '12px',
                       color: isDark ? '#FFFFFF' : '#000000'
                     }}>
@@ -529,18 +589,27 @@ const LaporPiket = () => {
                       )}
 
                       <div style={{ flex: 1, overflow: 'hidden' }}>
-                        <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</p>
-                        {uploadProgress[f.name] !== undefined && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{entry.name}</p>
+                          {isDone && <CheckCircle size={16} color="#10B981" style={{ flexShrink: 0 }} />}
+                          {isFileUploading && <Loader size={16} color="#F97316" style={{ flexShrink: 0, animation: 'spin 1s linear infinite' }} />}
+                          {isError && <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#EF4444', flexShrink: 0 }}>Gagal!</span>}
+                        </div>
+                        {isFileUploading && (
                           <div style={{ width: '100%', height: '4px', backgroundColor: isDark ? '#3D291C' : '#E5E7EB', borderRadius: '2px', marginTop: '6px' }}>
-                            <div style={{ width: `${uploadProgress[f.name]}%`, height: '100%', backgroundColor: '#F97316', borderRadius: '2px', transition: 'width 0.2s' }}></div>
+                            <div style={{ width: `${entry.progress}%`, height: '100%', backgroundColor: '#F97316', borderRadius: '2px', transition: 'width 0.2s' }}></div>
                           </div>
+                        )}
+                        {isDone && (
+                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', marginTop: '2px', display: 'block' }}>✅ Upload selesai</span>
                         )}
                       </div>
 
                       <button
                         type="button"
-                        onClick={() => removeFile(idx)}
-                        style={{ color: '#DC2626', background: 'none', border: 'none', fontWeight: 700, cursor: 'pointer', padding: '8px' }}
+                        onClick={() => removeFile(entry.id)}
+                        disabled={isFileUploading}
+                        style={{ color: isFileUploading ? '#9CA3AF' : '#DC2626', background: 'none', border: 'none', fontWeight: 700, cursor: isFileUploading ? 'not-allowed' : 'pointer', padding: '8px' }}
                       >
                         Hapus
                       </button>
@@ -554,26 +623,35 @@ const LaporPiket = () => {
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !allUploaded}
               style={{
                 padding: '16px 32px',
-                backgroundColor: loading ? '#FDBA74' : '#F97316',
+                backgroundColor: (loading || !allUploaded) ? '#FDBA74' : '#F97316',
                 color: 'white',
                 border: 'none',
                 borderRadius: '32px',
                 fontSize: '1.05rem',
                 fontWeight: 800,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                boxShadow: '0 4px 12px rgba(249, 115, 22, 0.3)',
-                transition: 'transform 0.1s'
+                cursor: (loading || !allUploaded) ? 'not-allowed' : 'pointer',
+                boxShadow: (loading || !allUploaded) ? 'none' : '0 4px 12px rgba(249, 115, 22, 0.3)',
+                transition: 'transform 0.1s',
+                opacity: (loading || !allUploaded) ? 0.6 : 1
               }}
-              onMouseDown={(e) => !loading && (e.target.style.transform = 'scale(0.95)')}
+              onMouseDown={(e) => !(loading || !allUploaded) && (e.target.style.transform = 'scale(0.95)')}
               onMouseUp={(e) => (e.target.style.transform = 'scale(1)')}
               onMouseLeave={(e) => (e.target.style.transform = 'scale(1)')}
             >
-              {loading ? 'Mengirim...' : 'Kirim Laporan'}
+              {isUploading ? 'Menunggu Upload...' : loading ? 'Mengirim...' : fileEntries.length === 0 ? 'Upload Bukti Dulu' : fileEntries.some(f => f.status === 'error') ? 'Ada File Gagal' : 'Kirim Laporan'}
             </button>
           </div>
+
+          {/* Spin animation for loader */}
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
 
         </form>
       </div>
@@ -582,3 +660,4 @@ const LaporPiket = () => {
 };
 
 export default LaporPiket;
+

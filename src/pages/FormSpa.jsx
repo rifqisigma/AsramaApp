@@ -11,7 +11,9 @@ import {
   CreditCard,
   Image as ImageIcon,
   DollarSign,
-  AlertCircle
+  AlertCircle,
+  Check,
+  RotateCcw
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
@@ -25,19 +27,22 @@ const FormSpa = () => {
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
 
-  // Form State
-  const [bulan, setBulan] = useState('Januari');
-  const [tahun, setTahun] = useState(() => new Date().getFullYear());
-  const [statusBayar, setStatusBayar] = useState('lunas'); // lunas or nyicil
-  const [file, setFile] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [errorMsg, setErrorMsg] = useState('');
-
   // Indonesian Months
   const indonesianMonths = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
   ];
+
+  // Form State: bulan as an array of strings
+  const [selectedMonths, setSelectedMonths] = useState(() => {
+    const currentMonthIdx = new Date().getMonth();
+    return [indonesianMonths[currentMonthIdx]];
+  });
+  const [tahun, setTahun] = useState(() => new Date().getFullYear());
+  const [statusBayar, setStatusBayar] = useState('lunas'); // lunas or nyicil
+  const [file, setFile] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [errorMsg, setErrorMsg] = useState('');
 
   // Fetch current username for storage filename
   useEffect(() => {
@@ -57,6 +62,37 @@ const FormSpa = () => {
     };
     fetchProfile();
   }, []);
+
+  const handleToggleMonth = (m) => {
+    setErrorMsg('');
+    setSelectedMonths(prev => {
+      if (prev.includes(m)) {
+        // Allow unchecking, but if it becomes empty user will need to pick before submit
+        return prev.filter(item => item !== m);
+      } else {
+        // Keep in calendar chronological order
+        const newSet = [...prev, m];
+        return indonesianMonths.filter(month => newSet.includes(month));
+      }
+    });
+  };
+
+  const handleSelectAll = () => {
+    setSelectedMonths([...indonesianMonths]);
+  };
+
+  const handleSelectSem1 = () => {
+    setSelectedMonths(indonesianMonths.slice(0, 6));
+  };
+
+  const handleSelectSem2 = () => {
+    setSelectedMonths(indonesianMonths.slice(6, 12));
+  };
+
+  const handleResetMonths = () => {
+    const currentMonthIdx = new Date().getMonth();
+    setSelectedMonths([indonesianMonths[currentMonthIdx]]);
+  };
 
   const handleFileSelect = (e) => {
     setErrorMsg('');
@@ -78,6 +114,11 @@ const FormSpa = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+
+    if (selectedMonths.length === 0) {
+      setErrorMsg("Harap pilih minimal 1 bulan pembayaran.");
+      return;
+    }
 
     if (!file) {
       setErrorMsg("Harap unggah bukti pembayaran (foto/gambar receipt).");
@@ -117,10 +158,10 @@ const FormSpa = () => {
         bendaharaRef = doc(db, 'users', auth.currentUser.uid);
       }
 
-      // 2. Upload file to Firebase Storage: AsramaApp/buktispa/${username}_${bulan}_${tahun}_${Date.now()}.${ext}
+      // 2. Upload file to Firebase Storage: AsramaApp/buktispa/${username}_${cleanMonths}_${tahun}_${Date.now()}.${ext}
       const extension = file.name.split('.').pop();
-      const cleanBulan = bulan.trim().replace(/\s+/g, '-');
-      const customFileName = `${username}_${cleanBulan}_${tahun}_${Date.now()}.${extension}`;
+      const cleanMonths = selectedMonths.map(m => m.slice(0, 3)).join('-') || 'spa';
+      const customFileName = `${username}_${cleanMonths}_${tahun}_${Date.now()}.${extension}`;
       
       const fileRef = ref(storage, `AsramaApp/buktispa/${customFileName}`);
       const uploadTask = uploadBytesResumable(fileRef, file);
@@ -140,9 +181,9 @@ const FormSpa = () => {
         );
       });
 
-      // 3. Save submission to collection 'Spa'
+      // 3. Save submission to collection 'Spa' with 'bulan' as an Array of Strings
       const submissionData = {
-        bulan: bulan,
+        bulan: selectedMonths, // Multiple choice list [ 'Januari', 'Februari', ... ]
         tahun: tahun,
         bukti: downloadUrl,
         verification: false,
@@ -157,11 +198,11 @@ const FormSpa = () => {
 
       addNotification({
         title: "Pembayaran SPA Terkirim",
-        body: "Bukti pembayaran SPA Anda berhasil dikirim. Menunggu verifikasi Bendahara...",
+        body: `Bukti pembayaran SPA untuk ${selectedMonths.join(', ')} berhasil dikirim. Menunggu verifikasi Bendahara...`,
         type: "spa_submission"
       });
 
-      alert("Bukti pembayaran SPA berhasil dikirim dan menunggu verifikasi Bendahara!");
+      alert(`Bukti pembayaran SPA (${selectedMonths.join(', ')}) berhasil dikirim dan menunggu verifikasi Bendahara!`);
       navigate('/spa');
     } catch (error) {
       console.error("Error submitting SPA payment form:", error);
@@ -221,7 +262,7 @@ const FormSpa = () => {
         borderRadius: '28px',
         padding: '32px 24px',
         border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
-        borderTop: '10px solid #F97316', // Orange pekat top bar ala Google Forms but Premium
+        borderTop: '10px solid #F97316',
         boxShadow: `0 8px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}, 0 15px 20px rgba(251, 146, 60, 0.05)`,
         marginBottom: '24px',
         transition: 'all 0.3s ease'
@@ -230,7 +271,7 @@ const FormSpa = () => {
           Form Pembayaran SPA
         </h1>
         <p style={{ color: isDark ? '#FED7AA' : '#6B7280', margin: 0, fontSize: '0.9rem', fontWeight: 700, lineHeight: 1.5 }}>
-          Harap isi form ini setelah melakukan transfer / scan QRIS. Bukti pembayaran akan langsung dikirim ke Bendahara untuk diverifikasi.
+          Pilih satu atau beberapa bulan pembayaran sekaligus. Bukti pembayaran akan dikirim langsung ke Bendahara.
         </p>
       </div>
 
@@ -257,7 +298,7 @@ const FormSpa = () => {
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
-        {/* Month Selector (Custom premium Grid Picker) */}
+        {/* Month Selector: Multiple Choice Grid with Quick Selection Chips */}
         <div style={{
           backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
           borderRadius: '28px',
@@ -266,23 +307,122 @@ const FormSpa = () => {
           boxShadow: `0 8px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}, 0 15px 20px rgba(251, 146, 60, 0.05)`,
           transition: 'all 0.3s ease'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: '#F97316' }}>
-            <Calendar size={20} strokeWidth={2.5} />
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>Pilih Bulan Pembayaran</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#F97316' }}>
+              <Calendar size={20} strokeWidth={2.5} />
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>Pilih Bulan Pembayaran</h3>
+            </div>
+            
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 850,
+              backgroundColor: selectedMonths.length > 0 ? '#F97316' : (isDark ? '#3D291C' : '#E5E7EB'),
+              color: selectedMonths.length > 0 ? '#FFFFFF' : '#9CA3AF',
+              padding: '3px 10px',
+              borderRadius: '10px'
+            }}>
+              {selectedMonths.length} Bulan
+            </span>
           </div>
 
+          <p style={{ color: isDark ? '#FED7AA' : '#6B7280', fontSize: '0.78rem', fontWeight: 700, margin: '0 0 14px 0' }}>
+            Ketuk untuk memilih satu atau beberapa bulan (Multiple Choice)
+          </p>
+
+          {/* Quick Select Buttons */}
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '6px',
+            marginBottom: '16px'
+          }}>
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              style={{
+                backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                color: '#F97316',
+                border: `1.5px solid ${isDark ? '#4A2E1E' : '#FED7AA'}`,
+                borderRadius: '12px',
+                padding: '4px 10px',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              Semua (1 Tahun)
+            </button>
+            <button
+              type="button"
+              onClick={handleSelectSem1}
+              style={{
+                backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                color: '#F97316',
+                border: `1.5px solid ${isDark ? '#4A2E1E' : '#FED7AA'}`,
+                borderRadius: '12px',
+                padding: '4px 10px',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              Jan - Jun
+            </button>
+            <button
+              type="button"
+              onClick={handleSelectSem2}
+              style={{
+                backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                color: '#F97316',
+                border: `1.5px solid ${isDark ? '#4A2E1E' : '#FED7AA'}`,
+                borderRadius: '12px',
+                padding: '4px 10px',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              Jul - Des
+            </button>
+            <button
+              type="button"
+              onClick={handleResetMonths}
+              style={{
+                backgroundColor: isDark ? '#2D1D13' : '#F3F4F6',
+                color: isDark ? '#9CA3AF' : '#6B7280',
+                border: `1.5px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+                borderRadius: '12px',
+                padding: '4px 10px',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                outline: 'none'
+              }}
+            >
+              <RotateCcw size={12} />
+              <span>Reset</span>
+            </button>
+          </div>
+
+          {/* Grid of 12 Months */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
             gap: '10px'
           }}>
             {indonesianMonths.map((m) => {
-              const isSelected = bulan === m;
+              const isSelected = selectedMonths.includes(m);
               return (
                 <button
                   key={m}
                   type="button"
-                  onClick={() => setBulan(m)}
+                  onClick={() => handleToggleMonth(m)}
                   style={{
                     backgroundColor: isSelected ? '#F97316' : (isDark ? '#1E130C' : '#FFFFFF'),
                     color: isSelected ? '#FFFFFF' : (isDark ? '#FED7AA' : '#374151'),
@@ -295,7 +435,10 @@ const FormSpa = () => {
                     boxShadow: `0 3px 0 ${isSelected ? '#EA580C' : (isDark ? '#4A2E1E' : '#E5E7EB')}`,
                     transition: 'all 0.1s',
                     outline: 'none',
-                    textAlign: 'center'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px'
                   }}
                   onMouseDown={(e) => {
                     e.currentTarget.style.transform = 'translateY(2px)';
@@ -306,11 +449,29 @@ const FormSpa = () => {
                     e.currentTarget.style.boxShadow = `0 3px 0 ${isSelected ? '#EA580C' : (isDark ? '#4A2E1E' : '#E5E7EB')}`;
                   }}
                 >
-                  {m}
+                  {isSelected && <Check size={14} strokeWidth={3} />}
+                  <span>{m}</span>
                 </button>
               );
             })}
           </div>
+
+          {/* Summary Indicator of Selected Months */}
+          {selectedMonths.length > 0 && (
+            <div style={{
+              marginTop: '16px',
+              padding: '10px 14px',
+              borderRadius: '14px',
+              backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+              border: `1.5px dashed ${isDark ? '#4A2E1E' : '#FED7AA'}`,
+              fontSize: '0.82rem',
+              fontWeight: 750,
+              color: isDark ? '#FED7AA' : '#EA580C',
+              lineHeight: 1.4
+            }}>
+              <strong>Bulan Terpilih:</strong> {selectedMonths.join(', ')}
+            </div>
+          )}
         </div>
 
         {/* Year Selector */}
