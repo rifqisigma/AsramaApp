@@ -22,6 +22,8 @@ import FormAbsenMalam from './pages/FormAbsenMalam';
 import VerificationAbsenMalam from './pages/VerificationAbsenMalam';
 import CatatanPiket from './pages/CatatanPiket';
 import CreateBerita from './pages/CreateBerita';
+import MonitoringAll from './pages/MonitoringAll';
+import PiketPersonDetail from './pages/PiketPersonDetail';
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -111,6 +113,9 @@ function App() {
             <Route path="/verification-absen-malam" element={user ? <VerificationAbsenMalam /> : <Navigate to="/login" />} />
             <Route path="/catatan-piket" element={user ? <CatatanPiket /> : <Navigate to="/login" />} />
             <Route path="/create-berita" element={user ? <CreateBerita /> : <Navigate to="/login" />} />
+            <Route path="/monitoring-all" element={user ? <MonitoringAll /> : <Navigate to="/login" />} />
+            <Route path="/piket-person-detail" element={user ? <PiketPersonDetail /> : <Navigate to="/login" />} />
+            <Route path="/piket-personal-detail" element={user ? <PiketPersonDetail /> : <Navigate to="/login" />} />
             <Route path="/" element={<Navigate to={user ? "/home" : "/login"} />} />
           </Routes>
         </Router>

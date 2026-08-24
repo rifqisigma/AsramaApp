@@ -129,6 +129,59 @@ const CardPiket = ({ piketStats, userData, theme }) => {
             </button>
           </div>
         )}
+
+        {/* Monitoring Piket Section (Hanya untuk yang bukan CALON) */}
+        {userData?.statusPenghuni !== 'CALON' && (
+          <div style={{
+            backgroundColor: isDark ? '#1C2E4A' : '#EFF6FF',
+            padding: '16px',
+            borderRadius: '20px',
+            border: `1px solid ${isDark ? '#2563EB' : '#BFDBFE'}`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            transition: 'all 0.3s ease'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#FFFFFF' : '#1E40AF' }}>
+                📊 Monitoring Penghuni
+              </span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#3B82F6', backgroundColor: isDark ? '#1E293B' : '#DBEAFE', padding: '3px 8px', borderRadius: '10px' }}>
+                Kueri & Rekap
+              </span>
+            </div>
+            <button
+              onClick={() => window.location.href = '/monitoring-all'}
+              style={{
+                width: '100%',
+                padding: '12px',
+                backgroundColor: '#3B82F6',
+                color: 'white',
+                border: `2px solid #2563EB`,
+                borderRadius: '16px',
+                fontSize: '0.95rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 4px 0 #1D4ED8',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.1s ease'
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = 'translateY(2px)';
+                e.currentTarget.style.boxShadow = '0 2px 0 #1D4ED8';
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 0 #1D4ED8';
+              }}
+            >
+              Lihat Monitoring Piket
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
