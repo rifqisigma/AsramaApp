@@ -9,9 +9,9 @@ const CardAbsenMalam = ({ userData, theme, navigate }) => {
   const titleColor = isDark ? '#FFFFFF' : '#1C1C1E';
   const descColor = isDark ? '#D1D5DB' : '#6B7280';
 
-  const hasJabatan = userData?.jabatan && userData.jabatan.trim() !== '';
+  const isCalon = userData?.statusPenghuni === 'CALON';
 
-  // Time-based lock: only open 22:00-22:30 WIB
+  // Time-based lock for Form: only open 22:00-22:30 WIB
   const [isOpen, setIsOpen] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
 
@@ -28,28 +28,25 @@ const CardAbsenMalam = ({ userData, theme, navigate }) => {
 
       if (totalMinutes >= openTime && totalMinutes < closeTime) {
         setIsOpen(true);
-        // Calculate remaining time
         const remainingMinutes = closeTime - totalMinutes;
         const remainingSecs = 60 - now.getSeconds();
         if (remainingMinutes <= 1) {
-          setTimeLeft(`${remainingSecs} detik lagi`);
+          setTimeLeft(`${remainingSecs}d lagi`);
         } else {
-          setTimeLeft(`${remainingMinutes} menit lagi`);
+          setTimeLeft(`${remainingMinutes}m lagi`);
         }
       } else {
         setIsOpen(false);
-        // Calculate time until next opening
         if (totalMinutes < openTime) {
           const diff = openTime - totalMinutes;
           const h = Math.floor(diff / 60);
           const m = diff % 60;
-          setTimeLeft(h > 0 ? `${h} jam ${m} menit lagi` : `${m} menit lagi`);
+          setTimeLeft(h > 0 ? `${h}j ${m}m lagi` : `${m}m lagi`);
         } else {
-          // After 22:30, next day
           const diff = (24 * 60 - totalMinutes) + openTime;
           const h = Math.floor(diff / 60);
           const m = diff % 60;
-          setTimeLeft(h > 0 ? `${h} jam ${m} menit lagi` : `${m} menit lagi`);
+          setTimeLeft(h > 0 ? `${h}j ${m}m lagi` : `${m}m lagi`);
         }
       }
     };
@@ -60,208 +57,169 @@ const CardAbsenMalam = ({ userData, theme, navigate }) => {
   }, []);
 
   return (
-    <div style={{
-      position: 'relative',
-      borderRadius: '24px',
-      overflow: 'hidden',
-    }}>
+    <div style={{ position: 'relative', borderRadius: '24px', marginBottom: '24px' }}>
       {/* Main Card Content */}
-      <div style={{
-        backgroundColor: cardBg,
-        borderRadius: '24px',
-        padding: '24px',
-        border: `2px solid ${cardBorder}`,
-        boxShadow: `0 8px 0 ${cardBorder}, 0 10px 15px rgba(0, 0, 0, 0.05)`,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px',
-        transition: 'all 0.3s ease',
-        filter: !isOpen ? 'blur(2px)' : 'none',
-        pointerEvents: !isOpen ? 'none' : 'auto',
-      }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ClipboardCheck size={24} color="#F43F5E" />
-            <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: titleColor, transition: 'color 0.3s' }}>
-              Absen Malam
-            </h3>
+      <div
+        style={{
+          backgroundColor: cardBg,
+          borderRadius: '24px',
+          padding: '24px',
+          border: `2px solid ${cardBorder}`,
+          boxShadow: `0 8px 0 ${cardBorder}, 0 10px 15px rgba(0, 0, 0, 0.05)`,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          transition: 'all 0.3s ease',
+          ...(isCalon ? {
+            filter: 'blur(2px)',
+            opacity: 0.7,
+            pointerEvents: 'none',
+            userSelect: 'none'
+          } : {})
+        }}
+      >
+        {/* Header with Title & Status Badge */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ClipboardCheck size={24} color="#F43F5E" />
+              <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: titleColor }}>
+                Absen Malam
+              </h3>
+            </div>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: descColor, fontWeight: 600 }}>
+              Pencatatan absensi malam otomatis berbasis GPS
+            </p>
           </div>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: descColor, fontWeight: 600, transition: 'color 0.3s' }}>
-            Pencatatan absensi malam otomatis menggunakan lokasi (GPS) dan verifikasi admin.
-          </p>
+
+          {/* Form Schedule Pill */}
+          <div
+            style={{
+              padding: '4px 10px',
+              borderRadius: '12px',
+              backgroundColor: isOpen
+                ? isDark ? '#064E3B' : '#ECFDF5'
+                : isDark ? '#3D291C' : '#FFF7ED',
+              border: `1px solid ${isOpen ? '#10B981' : '#F97316'}`,
+              color: isOpen ? '#10B981' : '#F97316',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0
+            }}
+          >
+            <Clock size={12} />
+            <span>{isOpen ? `Buka (${timeLeft})` : `Buka 22:00 WIB`}</span>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        {/* Action Buttons Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: !isCalon ? '1fr 1fr' : '1fr', gap: '10px' }}>
+          {/* Button 1: Isi Form (Only enabled/open 22:00-22:30, or clickable to see timer) */}
           <button
             onClick={() => navigate('/form-absen-malam')}
             style={{
-              flex: 1,
-              minWidth: '120px',
-              padding: '14px',
-              backgroundColor: '#F97316',
-              color: 'white',
-              border: '2px solid #EA580C',
+              padding: '13px',
+              backgroundColor: isOpen ? '#F97316' : isDark ? '#3D291C' : '#FFEDD5',
+              color: isOpen ? 'white' : isDark ? '#FED7AA' : '#C2410C',
+              border: `2px solid ${isOpen ? '#EA580C' : isDark ? '#4A2E1E' : '#FDBA74'}`,
               borderRadius: '16px',
-              fontSize: '0.95rem',
+              fontSize: '0.88rem',
               fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: '0 4px 0 #EA580C',
+              boxShadow: isOpen ? '0 4px 0 #EA580C' : isDark ? '0 3px 0 #4A2E1E' : '0 3px 0 #FDBA74',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px',
-              transition: 'transform 0.1s'
+              gap: '6px',
+              transition: 'transform 0.1s, box-shadow 0.1s'
             }}
             onMouseDown={(e) => {
               e.currentTarget.style.transform = 'translateY(2px)';
-              e.currentTarget.style.boxShadow = '0 2px 0 #EA580C';
+              e.currentTarget.style.boxShadow = isOpen ? '0 1px 0 #EA580C' : 'none';
             }}
             onMouseUp={(e) => {
               e.currentTarget.style.transform = 'translateY(0px)';
-              e.currentTarget.style.boxShadow = '0 4px 0 #EA580C';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0px)';
-              e.currentTarget.style.boxShadow = '0 4px 0 #EA580C';
+              e.currentTarget.style.boxShadow = isOpen ? '0 4px 0 #EA580C' : isDark ? '0 3px 0 #4A2E1E' : '0 3px 0 #FDBA74';
             }}
           >
-            <MapPin size={18} />
-            <span>Isi Form</span>
+            {isOpen ? <MapPin size={16} /> : <Lock size={16} />}
+            <span>{isOpen ? 'Isi Form Absen' : 'Form (22:00)'}</span>
           </button>
 
-          {hasJabatan && (
+          {/* Button 2: Verifikasi (Always open 24/7 for all non-CALON residents) */}
+          {!isCalon && (
             <button
               onClick={() => navigate('/verification-absen-malam')}
               style={{
-                flex: 1,
-                minWidth: '120px',
-                padding: '14px',
+                padding: '13px',
                 backgroundColor: '#3B82F6',
                 color: 'white',
                 border: '2px solid #2563EB',
                 borderRadius: '16px',
-                fontSize: '0.95rem',
+                fontSize: '0.88rem',
                 fontWeight: 800,
                 cursor: 'pointer',
-                boxShadow: '0 4px 0 #2563EB',
+                boxShadow: '0 4px 0 #1D4ED8',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
-                transition: 'transform 0.1s'
+                gap: '6px',
+                transition: 'transform 0.1s, box-shadow 0.1s'
               }}
               onMouseDown={(e) => {
                 e.currentTarget.style.transform = 'translateY(2px)';
-                e.currentTarget.style.boxShadow = '0 2px 0 #2563EB';
+                e.currentTarget.style.boxShadow = '0 1px 0 #1D4ED8';
               }}
               onMouseUp={(e) => {
                 e.currentTarget.style.transform = 'translateY(0px)';
-                e.currentTarget.style.boxShadow = '0 4px 0 #2563EB';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0px)';
-                e.currentTarget.style.boxShadow = '0 4px 0 #2563EB';
+                e.currentTarget.style.boxShadow = '0 4px 0 #1D4ED8';
               }}
             >
-              <ShieldCheck size={18} />
-              <span>Verifikasi</span>
+              <ShieldCheck size={16} />
+              <span>Verifikasi (24 Jam)</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Glassmorphism Lock Overlay */}
-      {!isOpen && (
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: isDark
-            ? 'rgba(30, 19, 12, 0.65)'
-            : 'rgba(255, 255, 255, 0.55)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          borderRadius: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
-          border: `1px solid ${isDark ? 'rgba(74, 46, 30, 0.5)' : 'rgba(255, 237, 213, 0.7)'}`,
-          zIndex: 2,
-        }}>
-          <div style={{
-            backgroundColor: isDark ? 'rgba(45, 29, 19, 0.8)' : 'rgba(255, 255, 255, 0.85)',
-            borderRadius: '20px',
-            padding: '24px 32px',
+      {/* Lock Overlay for CALON Penghuni */}
+      {isCalon && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: isDark ? 'rgba(45, 29, 19, 0.3)' : 'rgba(255, 255, 255, 0.3)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            borderRadius: '24px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '12px',
-            border: `1.5px solid ${isDark ? 'rgba(249, 115, 22, 0.3)' : 'rgba(249, 115, 22, 0.2)'}`,
-            boxShadow: isDark
-              ? '0 8px 32px rgba(0, 0, 0, 0.4)'
-              : '0 8px 32px rgba(249, 115, 22, 0.1)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            textAlign: 'center',
-            maxWidth: '280px',
-          }}>
-            <div style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              background: isDark
-                ? 'linear-gradient(135deg, #4A2E1E, #3D1A08)'
-                : 'linear-gradient(135deg, #FFF7ED, #FFEDD5)',
+            justifyContent: 'center',
+            zIndex: 10,
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.4)'}`
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)',
+              padding: '12px 24px',
+              borderRadius: '20px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: isDark
-                ? '0 4px 12px rgba(249, 115, 22, 0.2)'
-                : '0 4px 12px rgba(249, 115, 22, 0.15)',
-            }}>
-              <Lock size={28} color="#F97316" />
-            </div>
-            <div>
-              <h4 style={{
-                margin: '0 0 4px 0',
-                fontSize: '1.1rem',
-                fontWeight: 900,
-                color: isDark ? '#FFFFFF' : '#1F2937',
-              }}>
-                Absen Malam Terkunci
-              </h4>
-              <p style={{
-                margin: 0,
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                color: isDark ? '#FED7AA' : '#6B7280',
-                lineHeight: 1.4,
-              }}>
-                Dibuka pukul 22:00 – 22:30 WIB
-              </p>
-            </div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 16px',
-              borderRadius: '12px',
-              backgroundColor: isDark ? 'rgba(249, 115, 22, 0.15)' : 'rgba(249, 115, 22, 0.08)',
-              border: `1px solid ${isDark ? 'rgba(249, 115, 22, 0.3)' : 'rgba(249, 115, 22, 0.2)'}`,
-            }}>
-              <Clock size={14} color="#F97316" />
-              <span style={{
-                fontSize: '0.8rem',
-                fontWeight: 800,
-                color: '#F97316',
-              }}>
-                Buka {timeLeft}
-              </span>
-            </div>
+              gap: '10px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}
+          >
+            <span style={{ fontSize: '1.5rem' }}>🔒</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: titleColor }}>Khusus Penghuni</span>
           </div>
         </div>
       )}

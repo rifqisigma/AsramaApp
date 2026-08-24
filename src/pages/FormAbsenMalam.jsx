@@ -25,6 +25,50 @@ const FormAbsenMalam = () => {
   const [todaySubmission, setTodaySubmission] = useState(null);
   const [checkingDaily, setCheckingDaily] = useState(true);
 
+  // Time-based lock for Form: only open 22:00-22:30 WIB
+  const [isTimeOpen, setIsTimeOpen] = useState(false);
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    const checkTime = () => {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const totalMinutes = hours * 60 + minutes;
+
+      const openTime = 22 * 60; // 22:00
+      const closeTime = 22 * 60 + 30; // 22:30
+
+      if (totalMinutes >= openTime && totalMinutes < closeTime) {
+        setIsTimeOpen(true);
+        const remainingMinutes = closeTime - totalMinutes;
+        const remainingSecs = 60 - now.getSeconds();
+        if (remainingMinutes <= 1) {
+          setTimeLeft(`${remainingSecs} detik lagi`);
+        } else {
+          setTimeLeft(`${remainingMinutes} menit lagi`);
+        }
+      } else {
+        setIsTimeOpen(false);
+        if (totalMinutes < openTime) {
+          const diff = openTime - totalMinutes;
+          const h = Math.floor(diff / 60);
+          const m = diff % 60;
+          setTimeLeft(h > 0 ? `${h} jam ${m} menit lagi` : `${m} menit lagi`);
+        } else {
+          const diff = (24 * 60 - totalMinutes) + openTime;
+          const h = Math.floor(diff / 60);
+          const m = diff % 60;
+          setTimeLeft(h > 0 ? `${h} jam ${m} menit lagi` : `${m} menit lagi`);
+        }
+      }
+    };
+
+    checkTime();
+    const interval = setInterval(checkTime, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Map refresh key
   const [mapKey, setMapKey] = useState(() => Date.now());
   const [refreshSuccessMsg, setRefreshSuccessMsg] = useState(false);
@@ -345,9 +389,120 @@ const FormAbsenMalam = () => {
           <div>Memeriksa riwayat absen hari ini...</div>
         </div>
       )}
+      {/* Outside 22:00-22:30 WIB - Time Lock Screen */}
+      {!checkingDaily && !isTimeOpen && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          gap: '20px',
+          padding: '36px 20px',
+          backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+          borderRadius: '32px',
+          border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+          boxShadow: isDark ? '0 8px 0 #4A2E1E' : '0 8px 0 #FFEDD5',
+          marginTop: '1rem',
+          animation: 'bounceIn 0.4s'
+        }}>
+          <div style={{
+            backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+            color: '#F97316',
+            padding: '24px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 8px 20px rgba(249, 115, 22, 0.15)'
+          }}>
+            <Lock size={52} strokeWidth={2.5} />
+          </div>
+
+          <div>
+            <h2 style={{ fontSize: '1.45rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937', margin: '0 0 8px 0' }}>
+              Form Absen Malam Terkunci 🔒
+            </h2>
+            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280', lineHeight: 1.5 }}>
+              Form pengisian absen malam hanya dibuka pada pukul <strong>22:00 – 22:30 WIB</strong>.
+            </p>
+          </div>
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 18px',
+            borderRadius: '16px',
+            backgroundColor: isDark ? 'rgba(249, 115, 22, 0.15)' : 'rgba(249, 115, 22, 0.08)',
+            border: `1.5px solid ${isDark ? 'rgba(249, 115, 22, 0.3)' : 'rgba(249, 115, 22, 0.2)'}`,
+          }}>
+            <Clock size={16} color="#F97316" />
+            <span style={{
+              fontSize: '0.9rem',
+              fontWeight: 800,
+              color: '#F97316',
+            }}>
+              Dibuka dalam: {timeLeft}
+            </span>
+          </div>
+
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+            <button
+              onClick={() => navigate('/home')}
+              style={{
+                width: '100%',
+                backgroundColor: '#F97316',
+                color: 'white',
+                border: '2px solid #EA580C',
+                borderRadius: '20px',
+                padding: '14px',
+                fontSize: '1rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 5px 0 #EA580C',
+                transition: 'transform 0.1s, box-shadow 0.1s',
+                outline: 'none'
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = 'translateY(2px)';
+                e.currentTarget.style.boxShadow = '0 3px 0 #EA580C';
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = 'translateY(0px)';
+                e.currentTarget.style.boxShadow = '0 5px 0 #EA580C';
+              }}
+            >
+              Kembali ke Home
+            </button>
+
+            <button
+              onClick={() => navigate('/verification-absen-malam')}
+              style={{
+                width: '100%',
+                backgroundColor: isDark ? '#1E293B' : '#EFF6FF',
+                color: '#3B82F6',
+                border: `2px solid ${isDark ? '#334155' : '#BFDBFE'}`,
+                borderRadius: '20px',
+                padding: '12px',
+                fontSize: '0.9rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: isDark ? '0 4px 0 #334155' : '0 4px 0 #BFDBFE',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+            >
+              <ShieldCheck size={16} />
+              <span>Lihat Verifikasi Absen (Buka 24 Jam)</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Already submitted today - locked state (1 akun 1 kali per hari) */}
-      {!checkingDaily && alreadySubmittedToday && !success && (
+      {!checkingDaily && isTimeOpen && alreadySubmittedToday && !success && (
         <div style={{
           display: 'flex',
           flexDirection: 'column',
@@ -465,8 +620,8 @@ const FormAbsenMalam = () => {
         </div>
       )}
 
-      {/* Form State (Only when user has not submitted today) */}
-      {!checkingDaily && !alreadySubmittedToday && (
+      {/* Form State (Only when time is open and user has not submitted today) */}
+      {!checkingDaily && isTimeOpen && !alreadySubmittedToday && (
         <>
           {success ? (
             // Success View (Duolingo style)

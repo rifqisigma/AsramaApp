@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { auth, db } from '../firebase';
 import { collection, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
-import { ArrowLeft, ShieldAlert, Check, Calendar, MapPin, Eye, EyeOff, ShieldCheck, User } from 'lucide-react';
+import { ArrowLeft, ShieldAlert, Check, Calendar, CalendarDays, ChevronLeft, ChevronRight, MapPin, Eye, EyeOff, ShieldCheck, User, Sparkles } from 'lucide-react';
 
 const VerificationAbsenMalam = () => {
   const navigate = useNavigate();
@@ -18,6 +18,7 @@ const VerificationAbsenMalam = () => {
   const [usersMap, setUsersMap] = useState({});
   const [allAttendance, setAllAttendance] = useState([]);
   const [expandedMapId, setExpandedMapId] = useState(null);
+  const dateInputRef = useRef(null);
 
   // Selected Date state (defaults to today in local time YYYY-MM-DD)
   const [selectedDateStr, setSelectedDateStr] = useState(() => {
@@ -27,6 +28,51 @@ const VerificationAbsenMalam = () => {
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   });
+
+  const getTodayStr = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getYesterdayStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const shiftDate = (days) => {
+    const parts = selectedDateStr.split('-');
+    const cur = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    cur.setDate(cur.getDate() + days);
+    const year = cur.getFullYear();
+    const month = String(cur.getMonth() + 1).padStart(2, '0');
+    const day = String(cur.getDate()).padStart(2, '0');
+    setSelectedDateStr(`${year}-${month}-${day}`);
+  };
+
+  // Generate 7 recent days for quick swipe/strip
+  const getRecentDays = () => {
+    const list = [];
+    const base = new Date();
+    for (let i = -5; i <= 1; i++) {
+      const d = new Date();
+      d.setDate(base.getDate() + i);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${day}`;
+      const dayName = d.toLocaleDateString('id-ID', { weekday: 'short' });
+      const isToday = i === 0;
+      list.push({ dateStr, dayNumber: d.getDate(), dayName, isToday });
+    }
+    return list;
+  };
 
   // 1. Authorize User and Fetch Data
   useEffect(() => {
@@ -40,7 +86,7 @@ const VerificationAbsenMalam = () => {
         const userSnap = await getDoc(userDocRef);
         if (userSnap.exists()) {
           const userData = userSnap.data();
-          if (userData.jabatan && userData.jabatan.trim() !== '') {
+          if (userData.statusPenghuni !== 'CALON') {
             setAuthorized(true);
             await loadData();
           } else {
@@ -253,10 +299,10 @@ const VerificationAbsenMalam = () => {
             <ShieldAlert size={48} strokeWidth={2.5} />
           </div>
           <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937' }}>
-            Akses Ditolak 🛡️
+            Akses Dibatasi 🛡️
           </h2>
           <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280', lineHeight: 1.5 }}>
-            Mohon maaf, halaman verifikasi ini hanya dapat diakses oleh Kepenghunian / Staf Asrama yang memiliki jabatan aktif.
+            Halaman <b>Verifikasi Absen Malam</b> hanya dapat diakses oleh penghuni tetap asrama (bukan calon penghuni).
           </p>
           <button
             onClick={() => navigate('/home')}
@@ -345,39 +391,249 @@ const VerificationAbsenMalam = () => {
         </div>
       </div>
 
-      {/* Bagian 1: Calendar Date Picker */}
+      {/* Bagian 1: Interactive Date Picker Component */}
       <div style={{
         backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
         borderRadius: '24px',
-        padding: '20px',
+        padding: '18px 16px',
         border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
         boxShadow: isDark ? '0 6px 0 #4A2E1E' : '0 6px 0 #FFEDD5',
-        marginBottom: '24px'
+        marginBottom: '20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-          <Calendar size={20} color="#F97316" />
-          <span style={{ fontSize: '0.95rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937' }}>
-            Pilih Tanggal Absen
-          </span>
+        {/* Header with Title & Quick Action Pills */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CalendarDays size={20} color="#F97316" />
+            <span style={{ fontSize: '0.95rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937' }}>
+              Pilih Tanggal
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={() => setSelectedDateStr(getTodayStr())}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '10px',
+                backgroundColor: selectedDateStr === getTodayStr() ? '#F97316' : (isDark ? '#3D291C' : '#FFF7ED'),
+                color: selectedDateStr === getTodayStr() ? '#FFFFFF' : '#F97316',
+                border: `1.5px solid ${selectedDateStr === getTodayStr() ? '#EA580C' : (isDark ? '#4A2E1E' : '#FFEDD5')}`,
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Hari Ini
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDateStr(getYesterdayStr())}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '10px',
+                backgroundColor: selectedDateStr === getYesterdayStr() ? '#F97316' : (isDark ? '#3D291C' : '#FFF7ED'),
+                color: selectedDateStr === getYesterdayStr() ? '#FFFFFF' : '#F97316',
+                border: `1.5px solid ${selectedDateStr === getYesterdayStr() ? '#EA580C' : (isDark ? '#4A2E1E' : '#FFEDD5')}`,
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Kemarin
+            </button>
+          </div>
         </div>
-        <input 
-          type="date"
-          value={selectedDateStr}
-          onChange={(e) => setSelectedDateStr(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '14px',
-            borderRadius: '16px',
-            border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
-            fontSize: '1rem',
-            fontWeight: 700,
-            outline: 'none',
-            boxSizing: 'border-box',
-            backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
-            color: isDark ? '#FFFFFF' : '#1F2937',
-            transition: 'border-color 0.2s'
-          }}
-        />
+
+        {/* Selected Date Card with Steppers and Full Calendar Trigger */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          backgroundColor: isDark ? '#1E130C' : '#FFF9F5',
+          border: `2px solid ${isDark ? '#3D291C' : '#FED7AA'}`,
+          borderRadius: '16px',
+          padding: '6px 8px'
+        }}>
+          {/* Step Back Button */}
+          <button
+            type="button"
+            onClick={() => shiftDate(-1)}
+            title="Hari Sebelumnya"
+            style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '12px',
+              border: `1.5px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+              backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+              color: isDark ? '#FED7AA' : '#F97316',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              flexShrink: 0,
+              boxShadow: isDark ? '0 2px 0 #4A2E1E' : '0 2px 0 #FFEDD5',
+              transition: 'all 0.1s'
+            }}
+          >
+            <ChevronLeft size={20} strokeWidth={2.5} />
+          </button>
+
+          {/* Clickable Date Display Card (triggers native picker) */}
+          <div
+            onClick={() => {
+              if (dateInputRef.current) {
+                if (typeof dateInputRef.current.showPicker === 'function') {
+                  dateInputRef.current.showPicker();
+                } else {
+                  dateInputRef.current.focus();
+                }
+              }
+            }}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '6px 8px',
+              cursor: 'pointer',
+              borderRadius: '10px',
+              userSelect: 'none',
+              textAlign: 'center'
+            }}
+          >
+            <Calendar size={18} color="#F97316" />
+            <span style={{
+              fontSize: '0.95rem',
+              fontWeight: 900,
+              color: isDark ? '#FFFFFF' : '#1F2937',
+              letterSpacing: '-0.2px'
+            }}>
+              {(() => {
+                const parts = selectedDateStr.split('-');
+                const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                return d.toLocaleDateString('id-ID', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                });
+              })()}
+            </span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#F97316', backgroundColor: isDark ? '#3D291C' : '#FFF7ED', padding: '2px 6px', borderRadius: '6px' }}>
+              Ubah ▾
+            </span>
+          </div>
+
+          {/* Step Forward Button */}
+          <button
+            type="button"
+            onClick={() => shiftDate(1)}
+            title="Hari Berikutnya"
+            style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '12px',
+              border: `1.5px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+              backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+              color: isDark ? '#FED7AA' : '#F97316',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              flexShrink: 0,
+              boxShadow: isDark ? '0 2px 0 #4A2E1E' : '0 2px 0 #FFEDD5',
+              transition: 'all 0.1s'
+            }}
+          >
+            <ChevronRight size={20} strokeWidth={2.5} />
+          </button>
+
+          {/* Hidden native date input that syncs */}
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={selectedDateStr}
+            onChange={(e) => {
+              if (e.target.value) {
+                setSelectedDateStr(e.target.value);
+              }
+            }}
+            style={{
+              position: 'absolute',
+              opacity: 0,
+              width: 0,
+              height: 0,
+              pointerEvents: 'none'
+            }}
+          />
+        </div>
+
+        {/* Quick Date Strip (Horizontal Day Pills) */}
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          overflowX: 'auto',
+          paddingBottom: '4px',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none'
+        }}>
+          {getRecentDays().map(dayItem => {
+            const isSelected = selectedDateStr === dayItem.dateStr;
+            return (
+              <button
+                key={dayItem.dateStr}
+                type="button"
+                onClick={() => setSelectedDateStr(dayItem.dateStr)}
+                style={{
+                  flex: '0 0 auto',
+                  minWidth: '54px',
+                  padding: '8px 6px',
+                  borderRadius: '14px',
+                  backgroundColor: isSelected
+                    ? '#F97316'
+                    : isDark ? '#1E130C' : '#FFFFFF',
+                  color: isSelected
+                    ? '#FFFFFF'
+                    : isDark ? '#D1D5DB' : '#4B5563',
+                  border: `1.5px solid ${isSelected ? '#EA580C' : (isDark ? '#3D291C' : '#E5E7EB')}`,
+                  boxShadow: isSelected
+                    ? '0 3px 0 #EA580C'
+                    : isDark ? '0 2px 0 #3D291C' : '0 2px 0 #E5E7EB',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '2px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', opacity: isSelected ? 0.9 : 0.7 }}>
+                  {dayItem.dayName}
+                </span>
+                <span style={{ fontSize: '1.1rem', fontWeight: 900, lineHeight: 1.1 }}>
+                  {dayItem.dayNumber}
+                </span>
+                {dayItem.isToday && (
+                  <span style={{
+                    fontSize: '0.6rem',
+                    fontWeight: 900,
+                    color: isSelected ? '#FEF08A' : '#F97316',
+                    marginTop: '1px'
+                  }}>
+                    • Hari ini
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Bagian 2: List Data Absen */}
