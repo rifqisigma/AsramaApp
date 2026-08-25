@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { db, auth } from '../firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -6,15 +6,18 @@ import {
   ArrowLeft,
   Search,
   Calendar,
+  CalendarDays,
   User,
   Filter,
   RotateCcw,
   Layers,
   ShieldAlert,
   ChevronRight,
+  ChevronLeft,
   MapPin,
   Clock,
-  CheckCircle
+  CheckCircle,
+  X
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import MonitoringFilterForm from '../components/MonitoringFilterForm';
@@ -37,6 +40,53 @@ const MonitoringAll = () => {
   const [loading, setLoading] = useState(false);
   const [aggregatedUsers, setAggregatedUsers] = useState([]);
   const [availableAngkatan, setAvailableAngkatan] = useState([]);
+
+  // Date picker ref & helpers
+  const dateInputRef = useRef(null);
+
+  const getTodayStr = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getYesterdayStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const shiftDate = (days) => {
+    const baseStr = tanggalFilter || getTodayStr();
+    const parts = baseStr.split('-');
+    const cur = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    cur.setDate(cur.getDate() + days);
+    const year = cur.getFullYear();
+    const month = String(cur.getMonth() + 1).padStart(2, '0');
+    const day = String(cur.getDate()).padStart(2, '0');
+    setTanggalFilter(`${year}-${month}-${day}`);
+  };
+
+  const formatSelectedDate = (dateStr) => {
+    if (!dateStr) return 'Semua Tanggal';
+    try {
+      const parts = dateStr.split('-');
+      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      return d.toLocaleDateString('id-ID', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
 
   // Check user permission on mount
   useEffect(() => {
@@ -138,7 +188,10 @@ const MonitoringAll = () => {
 
         if (tanggalFilter) {
           if (!piketDateObj) return;
-          const piketDateStr = piketDateObj.toISOString().slice(0, 10);
+          const year = piketDateObj.getFullYear();
+          const month = String(piketDateObj.getMonth() + 1).padStart(2, '0');
+          const day = String(piketDateObj.getDate()).padStart(2, '0');
+          const piketDateStr = `${year}-${month}-${day}`;
           if (piketDateStr !== tanggalFilter) return;
         }
 
@@ -393,46 +446,214 @@ const MonitoringAll = () => {
           hasActiveFilter={Boolean(namaFilter || angkatanFilter !== 'ALL' || tanggalFilter || hasQueried)}
           extraFilterComponent={
             <div>
-              <label
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                <label
+                  style={{
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    color: isDark ? '#FED7AA' : '#374151'
+                  }}
+                >
+                  Tanggal Piket
+                </label>
+                {tanggalFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setTanggalFilter('')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#EF4444',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      padding: '0 4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '2px'
+                    }}
+                  >
+                    <X size={12} />
+                    Reset Tgl
+                  </button>
+                )}
+              </div>
+
+              {/* Interactive Date Picker Trigger Card */}
+              <div
                 style={{
-                  display: 'block',
-                  fontSize: '0.85rem',
-                  fontWeight: 800,
-                  color: isDark ? '#FED7AA' : '#374151',
-                  marginBottom: '6px'
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
+                  border: isDark ? '2px solid #4A2E1E' : '2px solid #E5E7EB',
+                  borderRadius: '12px',
+                  padding: '4px 6px',
+                  position: 'relative'
                 }}
               >
-                Tanggal Piket
-              </label>
-              <div style={{ position: 'relative' }}>
-                <Calendar
-                  size={18}
-                  style={{
-                    position: 'absolute',
-                    left: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#9CA3AF',
-                    pointerEvents: 'none'
+                {/* Stepper Back (only if date selected) */}
+                {tanggalFilter && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      shiftDate(-1);
+                    }}
+                    title="Hari Sebelumnya"
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '8px',
+                      border: isDark ? '1px solid #4A2E1E' : '1px solid #E5E7EB',
+                      backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+                      color: isDark ? '#FED7AA' : '#F97316',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                  >
+                    <ChevronLeft size={16} strokeWidth={2.5} />
+                  </button>
+                )}
+
+                {/* Date display & trigger native picker */}
+                <div
+                  onClick={() => {
+                    if (dateInputRef.current) {
+                      if (typeof dateInputRef.current.showPicker === 'function') {
+                        dateInputRef.current.showPicker();
+                      } else {
+                        dateInputRef.current.focus();
+                      }
+                    }
                   }}
-                />
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '6px',
+                    padding: '6px 4px',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    minWidth: 0
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                    <Calendar size={16} color="#F97316" style={{ flexShrink: 0 }} />
+                    <span
+                      style={{
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        color: tanggalFilter ? (isDark ? '#FFFFFF' : '#111827') : (isDark ? '#9CA3AF' : '#6B7280'),
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}
+                    >
+                      {formatSelectedDate(tanggalFilter)}
+                    </span>
+                  </div>
+
+                  <span
+                    style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      color: '#F97316',
+                      backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                      padding: '2px 6px',
+                      borderRadius: '6px',
+                      flexShrink: 0
+                    }}
+                  >
+                    Pilih ▾
+                  </span>
+                </div>
+
+                {/* Stepper Forward (only if date selected) */}
+                {tanggalFilter && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      shiftDate(1);
+                    }}
+                    title="Hari Berikutnya"
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '8px',
+                      border: isDark ? '1px solid #4A2E1E' : '1px solid #E5E7EB',
+                      backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+                      color: isDark ? '#FED7AA' : '#F97316',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                  >
+                    <ChevronRight size={16} strokeWidth={2.5} />
+                  </button>
+                )}
+
+                {/* Hidden native date input that syncs */}
                 <input
+                  ref={dateInputRef}
                   type="date"
                   value={tanggalFilter}
                   onChange={(e) => setTanggalFilter(e.target.value)}
                   style={{
-                    width: '100%',
-                    padding: '11px 8px 11px 36px',
-                    borderRadius: '14px',
-                    border: isDark ? '2px solid #4A2E1E' : '2px solid #E5E7EB',
-                    backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
-                    color: isDark ? '#FFFFFF' : '#111827',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    outline: 'none',
-                    boxSizing: 'border-box'
+                    position: 'absolute',
+                    opacity: 0,
+                    width: 0,
+                    height: 0,
+                    pointerEvents: 'none'
                   }}
                 />
+              </div>
+
+              {/* Quick shortcut pills */}
+              <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setTanggalFilter(getTodayStr())}
+                  style={{
+                    flex: 1,
+                    padding: '3px 6px',
+                    borderRadius: '8px',
+                    backgroundColor: tanggalFilter === getTodayStr() ? '#F97316' : (isDark ? '#1E130C' : '#FFF7ED'),
+                    color: tanggalFilter === getTodayStr() ? '#FFFFFF' : '#F97316',
+                    border: `1px solid ${tanggalFilter === getTodayStr() ? '#EA580C' : (isDark ? '#4A2E1E' : '#FFEDD5')}`,
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Hari Ini
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTanggalFilter(getYesterdayStr())}
+                  style={{
+                    flex: 1,
+                    padding: '3px 6px',
+                    borderRadius: '8px',
+                    backgroundColor: tanggalFilter === getYesterdayStr() ? '#F97316' : (isDark ? '#1E130C' : '#FFF7ED'),
+                    color: tanggalFilter === getYesterdayStr() ? '#FFFFFF' : '#F97316',
+                    border: `1px solid ${tanggalFilter === getYesterdayStr() ? '#EA580C' : (isDark ? '#4A2E1E' : '#FFEDD5')}`,
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Kemarin
+                </button>
               </div>
             </div>
           }

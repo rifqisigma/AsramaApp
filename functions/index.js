@@ -353,51 +353,6 @@ exports.sendBulkNotification = onRequest(async (request, response) => {
   }
 });
 
-/**
- * Trigger: When absenMalam is uploaded
- * Send notification to Ketua, Wakil Ketua, or Kepenghunian
- */
-exports.onAbsenMalamUpload = onDocumentCreated("absenMalam/{absenMalamId}", async (event) => {
-  const data = event.data.data();
-  if (!data || !data.user) return;
-
-  const submitterId = typeof data.user === 'string'
-    ? data.user
-    : (data.user.id || data.user.path?.split('/').pop());
-
-  if (!submitterId) return;
-
-  try {
-    // Get submitter name
-    const submitterDoc = await db.collection("users").doc(submitterId).get();
-    const submitterName = submitterDoc.exists ? (submitterDoc.data().username || "Seorang penghuni") : "Seorang penghuni";
-
-    // Query admin users with relevant roles
-    const adminSnap = await db.collection("users")
-      .where("jabatan", "in", ["ketua", "wakil ketua", "kepenghunian"])
-      .get();
-
-    const adminIds = [];
-    adminSnap.forEach(doc => {
-      adminIds.push(doc.id);
-    });
-
-    if (adminIds.length === 0) return;
-
-    const title = "Absen Malam Baru";
-    const body = `${submitterName} telah mengirimkan absen malam. Silakan verifikasi.`;
-
-    await Promise.all(
-      adminIds.map(adminId => sendNotification(adminId, title, body, {
-        link: "/verification-absen-malam",
-        type: "absen_malam_upload",
-        absenMalamId: event.params.absenMalamId
-      }))
-    );
-  } catch (error) {
-    console.error("Error sending onAbsenMalamUpload notifications:", error);
-  }
-});
 
 /**
  * Trigger: When absenMalam is verified

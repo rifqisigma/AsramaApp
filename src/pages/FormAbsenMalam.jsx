@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { collection, addDoc, doc, GeoPoint, getDocs } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -278,12 +278,6 @@ const FormAbsenMalam = () => {
       };
 
       const docRef = await addDoc(collection(db, 'absenMalam'), newAttendance);
-
-      addNotification({
-        title: "Absen Malam Terkirim 📍",
-        body: `Absen malam Anda berhasil disubmit dari lokasi ${address.split(',')[0] || 'Asrama'}.`,
-        type: "absen_malam_submission"
-      });
 
       setTodaySubmission({
         id: docRef.id,
