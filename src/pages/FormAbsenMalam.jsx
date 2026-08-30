@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { collection, addDoc, doc, GeoPoint, getDocs } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -286,6 +286,14 @@ const FormAbsenMalam = () => {
       });
       setAlreadySubmittedToday(true);
       setSuccess(true);
+
+      if (addNotification) {
+        addNotification({
+          title: "Absen Malam Terkirim 🌙",
+          body: "Data absensi malam Anda berhasil dikirim dan menunggu verifikasi.",
+          type: "absen_malam_submitted"
+        });
+      }
     } catch (error) {
       console.error('Gagal mengirim absen:', error);
       alert('Terjadi kesalahan saat mengirim data absen. Silakan coba lagi.');
@@ -383,8 +391,75 @@ const FormAbsenMalam = () => {
           <div>Memeriksa riwayat absen hari ini...</div>
         </div>
       )}
-      {/* Outside 22:00-22:30 WIB - Time Lock Screen */}
-      {!checkingDaily && !isTimeOpen && (
+      {/* 2. Success View (When submission was just completed) */}
+      {!checkingDaily && success && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          gap: '24px',
+          padding: '32px 16px',
+          backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+          borderRadius: '32px',
+          border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+          boxShadow: isDark ? '0 8px 0 #4A2E1E' : '0 8px 0 #FFEDD5',
+          marginTop: '1rem',
+          animation: 'bounceIn 0.5s'
+        }}>
+          <div style={{
+            backgroundColor: isDark ? '#1C3D27' : '#ECFDF5',
+            color: '#10B981',
+            padding: '24px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 8px 20px rgba(16, 185, 129, 0.15)'
+          }}>
+            <CheckCircle size={64} strokeWidth={2.5} />
+          </div>
+          <div>
+            <h2 style={{ fontSize: '1.6rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937', margin: '0 0 8px 0' }}>
+              Absen Berhasil! 🎉
+            </h2>
+            <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280', lineHeight: 1.5 }}>
+              Kehadiran malam Anda telah tercatat dan sedang menunggu verifikasi oleh Kepenghunian / Staf Asrama.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/home')}
+            style={{
+              width: '100%',
+              backgroundColor: '#F97316',
+              color: 'white',
+              border: '2px solid #EA580C',
+              borderRadius: '20px',
+              padding: '16px',
+              fontSize: '1.05rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 6px 0 #EA580C',
+              transition: 'transform 0.1s, box-shadow 0.1s',
+              outline: 'none',
+              marginTop: '8px'
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = 'translateY(4px)';
+              e.currentTarget.style.boxShadow = '0 2px 0 #EA580C';
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = 'translateY(0px)';
+              e.currentTarget.style.boxShadow = '0 6px 0 #EA580C';
+            }}
+          >
+            Kembali ke Home
+          </button>
+        </div>
+      )}
+
+      {/* 3. Outside 22:00-22:30 WIB - Time Lock Screen */}
+      {!checkingDaily && !success && !isTimeOpen && (
         <div style={{
           display: 'flex',
           flexDirection: 'column',
@@ -495,8 +570,8 @@ const FormAbsenMalam = () => {
         </div>
       )}
 
-      {/* Already submitted today - locked state (1 akun 1 kali per hari) */}
-      {!checkingDaily && isTimeOpen && alreadySubmittedToday && !success && (
+      {/* 4. Already submitted today - locked state (1 akun 1 kali per hari) */}
+      {!checkingDaily && !success && isTimeOpen && alreadySubmittedToday && (
         <div style={{
           display: 'flex',
           flexDirection: 'column',
@@ -614,89 +689,21 @@ const FormAbsenMalam = () => {
         </div>
       )}
 
-      {/* Form State (Only when time is open and user has not submitted today) */}
-      {!checkingDaily && isTimeOpen && !alreadySubmittedToday && (
-        <>
-          {success ? (
-            // Success View (Duolingo style)
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              textAlign: 'center',
-              gap: '24px',
-              padding: '32px 16px',
-              backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
-              borderRadius: '32px',
-              border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
-              boxShadow: isDark ? '0 8px 0 #4A2E1E' : '0 8px 0 #FFEDD5',
-              marginTop: '1rem',
-              animation: 'bounceIn 0.5s'
-            }}>
-              <div style={{
-                backgroundColor: isDark ? '#1C3D27' : '#ECFDF5',
-                color: '#10B981',
-                padding: '24px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 8px 20px rgba(16, 185, 129, 0.15)'
-              }}>
-                <CheckCircle size={64} strokeWidth={2.5} />
-              </div>
-              <div>
-                <h2 style={{ fontSize: '1.6rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937', margin: '0 0 8px 0' }}>
-                  Absen Berhasil! 🎉
-                </h2>
-                <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280', lineHeight: 1.5 }}>
-                  Kehadiran malam Anda telah tercatat dan sedang menunggu verifikasi oleh Kepenghunian / Staf Asrama.
-                </p>
-              </div>
-              <button
-                onClick={() => navigate('/home')}
-                style={{
-                  width: '100%',
-                  backgroundColor: '#F97316',
-                  color: 'white',
-                  border: '2px solid #EA580C',
-                  borderRadius: '20px',
-                  padding: '16px',
-                  fontSize: '1.05rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  boxShadow: '0 6px 0 #EA580C',
-                  transition: 'transform 0.1s, box-shadow 0.1s',
-                  outline: 'none',
-                  marginTop: '8px'
-                }}
-                onMouseDown={(e) => {
-                  e.currentTarget.style.transform = 'translateY(4px)';
-                  e.currentTarget.style.boxShadow = '0 2px 0 #EA580C';
-                }}
-                onMouseUp={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0px)';
-                  e.currentTarget.style.boxShadow = '0 6px 0 #EA580C';
-                }}
-              >
-                Kembali ke Home
-              </button>
-            </div>
-          ) : (
-            // Form View
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Card Deteksi Lokasi */}
-              <div style={{
-                backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
-                borderRadius: '28px',
-                padding: '24px',
-                border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
-                boxShadow: isDark ? '0 8px 0 #4A2E1E' : '0 8px 0 #FFEDD5',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-                transition: 'all 0.3s ease'
-              }}>
+      {/* 5. Form View (Only when time is open and user has not submitted today and not in success state) */}
+      {!checkingDaily && !success && isTimeOpen && !alreadySubmittedToday && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Card Deteksi Lokasi */}
+          <div style={{
+            backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+            borderRadius: '28px',
+            padding: '24px',
+            border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+            boxShadow: isDark ? '0 8px 0 #4A2E1E' : '0 8px 0 #FFEDD5',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            transition: 'all 0.3s ease'
+          }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: isDark ? '#FFFFFF' : '#1F2937' }}>
                     📍 Informasi Lokasi
@@ -948,8 +955,6 @@ const FormAbsenMalam = () => {
               </button>
             </div>
           )}
-        </>
-      )}
 
       {/* Embedded Spin Animation CSS */}
       <style>{`

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { auth, db, storage } from '../firebase';
 import { getCookie, setCookie, getWeeklyResetTime } from '../utils/cookie';
+import { getGlobalWibDate } from '../utils/time';
 import { collection, getDocs, doc, addDoc, getDoc, query, where } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { ArrowLeft, Upload, CheckCircle, Search, ExternalLink, Loader } from 'lucide-react';
+import { ArrowLeft, Upload, CheckCircle, Search, ExternalLink, Loader, Clock } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
@@ -35,10 +36,6 @@ const LaporPiket = () => {
 
   // Form State
   const [place, setPlace] = useState('');
-  const [timestampStr, setTimestampStr] = useState(() => {
-    const now = new Date();
-    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-  });
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedLaporToUser, setSelectedLaporToUser] = useState(null);
@@ -194,13 +191,17 @@ const LaporPiket = () => {
         return;
       }
 
+      // Ambil waktu global WIB
+      const globalWibDate = await getGlobalWibDate();
+
       // Simpan ke Firestore
       const piketData = {
         buktiLink: uploadedUrls,
+        createdAt: globalWibDate,
         jenisKegiatan: 'piket',
         laporTo: doc(db, 'users', selectedLaporToUser.id),
         place: place,
-        timestamp: new Date(timestampStr),
+        timestamp: globalWibDate,
         userPiket: doc(db, 'users', auth.currentUser.uid),
         verification: false
       };
@@ -364,28 +365,24 @@ const LaporPiket = () => {
             </div>
 
             <div style={{ marginTop: '16px' }}>
-              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#4B5563', marginBottom: '8px' }}>Waktu Pelaksanaan *</label>
-              <input
-                type="datetime-local"
-                required
-                value={timestampStr}
-                onChange={(e) => setTimestampStr(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '12px',
-                  border: isDark ? '1px solid #4A2E1E' : '1px solid #D1D5DB',
-                  fontSize: '1rem',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
-                  color: isDark ? '#FFFFFF' : '#000000',
-                  borderBottom: `3px solid ${isDark ? '#4A2E1E' : '#D1D5DB'}`,
-                  transition: 'all 0.2s'
-                }}
-                onFocus={(e) => e.target.style.borderBottomColor = '#F97316'}
-                onBlur={(e) => e.target.style.borderBottomColor = isDark ? '#4A2E1E' : '#D1D5DB'}
-              />
+              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#4B5563', marginBottom: '8px' }}>
+                Waktu Pelaksanaan (Otomatis)
+              </label>
+              <div style={{
+                padding: '14px 16px',
+                borderRadius: '12px',
+                backgroundColor: isDark ? '#1E130C' : '#FFF7ED',
+                border: `1.5px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                color: isDark ? '#FED7AA' : '#C2410C',
+                fontSize: '0.9rem',
+                fontWeight: 700
+              }}>
+                <Clock size={18} color="#F97316" style={{ flexShrink: 0 }} />
+                <span>Tercatat otomatis sesuai Waktu Indonesia Barat (WIB) saat laporan dikirim</span>
+              </div>
             </div>
           </div>
 
