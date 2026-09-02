@@ -94,6 +94,7 @@ const SignUp = () => {
         angkatan: parseInt(angkatan) || 62,
         nim: nim.trim(),
         jabatan: jabatan.trim() || 'penghuni',
+        pointAcces: ['kepenghunian', 'proteksi', 'presiden', 'wakil presiden', 'wapres'].includes((jabatan.trim() || 'penghuni').toLowerCase()),
         fotoProfil: fotoProfil.trim() || defaultFotoProfil,
         point: 110,
         createdAt: new Date()
@@ -158,6 +159,7 @@ const SignUp = () => {
         angkatan: parseInt(angkatan) || 62,
         nim: nim.trim(),
         jabatan: jabatan.trim() || 'penghuni',
+        pointAcces: ['kepenghunian', 'proteksi', 'presiden', 'wakil presiden', 'wapres'].includes((jabatan.trim() || 'penghuni').toLowerCase()),
         fotoProfil: fotoProfil.trim() || '',
         point: 110,
         createdAt: new Date()

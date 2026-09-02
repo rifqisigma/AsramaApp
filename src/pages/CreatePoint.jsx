@@ -40,9 +40,16 @@ const CreatePoint = () => {
         const docSnap = await getDoc(userDocRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
-          const role = (data.jabatan || '').toLowerCase();
-          setUserRole(role);
-          if (role === 'kepenghunian' || role === 'proteksi') {
+          const role = (data.jabatan || '').toLowerCase().trim();
+          setUserRole(data.jabatan || '');
+          
+          const allowedRoles = ['kepenghunian', 'proteksi', 'presiden', 'wakil presiden', 'wapres'];
+          const hasAccess = data.pointAcces === true || 
+                            data.pointAccess === true || 
+                            data.point_access === true || 
+                            allowedRoles.includes(role);
+
+          if (hasAccess) {
             setIsAuthorized(true);
           } else {
             setIsAuthorized(false);
@@ -191,7 +198,7 @@ const CreatePoint = () => {
             Akses Ditolak
           </h1>
           <p style={{ color: isDark ? '#D1D5DB' : '#6B7280', fontSize: '0.95rem', fontWeight: 600, lineHeight: 1.5, margin: '0 0 32px 0' }}>
-            Halaman ini khusus untuk Staff **Kepenghunian** dan **Proteksi**. Jabatan Anda saat ini adalah: **{userRole || 'Umum'}**.
+            Halaman ini khusus untuk Staff **Kepenghunian**, **Proteksi**, **Presiden**, **Wakil Presiden**, atau akun dengan izin **pointAcces**. Jabatan Anda saat ini adalah: **{userRole || 'Umum'}**.
           </p>
 
           <button

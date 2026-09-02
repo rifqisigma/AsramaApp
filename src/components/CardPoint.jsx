@@ -169,8 +169,10 @@ const CardPoint = ({ userData, theme }) => {
               <span>📊 Rekap Poin</span>
             </button>
           </div>
-          {/* Staff‑only buttons – rendered conditionally in Home */}
-          {(userData?.jabatan?.toLowerCase() === 'kepenghunian' || userData?.jabatan?.toLowerCase() === 'proteksi') && (
+          {/* Staff / Authorized only buttons */}
+          {(userData?.pointAcces === true || 
+            userData?.pointAccess === true || 
+            ['kepenghunian', 'proteksi', 'presiden', 'wakil presiden', 'wapres'].includes(userData?.jabatan?.toLowerCase()?.trim())) && (
             <div style={{
               marginTop: '8px',
               borderTop: dashBorder,
