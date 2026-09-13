@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
-import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, updateDoc } from 'firebase/firestore';
 import { ArrowLeft, Send } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
@@ -90,6 +90,15 @@ const CatatanPiket = () => {
         laporTo: piketData.laporTo || doc(db, 'users', currentUser.uid)
       });
       console.log('[CatatanPiket] Catatan saved with ID:', catatanDoc.id, 'Target userPiket:', userPiketId);
+
+      // Update status piket di Firestore menjadi 'rejected'
+      await updateDoc(piketRef, {
+        status: 'rejected',
+        verification: false,
+        rejectionNote: catatan.trim(),
+        rejectedAt: new Date(),
+        rejectedBy: currentUser.uid
+      });
 
       setSent(true);
     } catch (err) {

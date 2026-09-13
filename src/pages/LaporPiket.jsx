@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { auth, db, storage } from '../firebase';
 import { getCookie, setCookie, getWeeklyResetTime } from '../utils/cookie';
 import { getGlobalWibDate } from '../utils/time';
 import { collection, getDocs, doc, addDoc, getDoc, query, where } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { ArrowLeft, Upload, CheckCircle, Search, ExternalLink, Loader, Clock } from 'lucide-react';
+import { ArrowLeft, Upload, CheckCircle, Search, ExternalLink, Loader, Clock, RotateCw, MapPin, User, FileImage, X, AlertCircle, Calendar } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
@@ -45,6 +45,115 @@ const LaporPiket = () => {
   // Each entry: { file, name, size, status: 'uploading'|'done'|'error', progress: 0-100, url: string|null }
   const [fileEntries, setFileEntries] = useState([]);
   const fileInputRef = useRef(null);
+
+  // State untuk List Piket Belum Disetujui
+  const [pendingPikets, setPendingPikets] = useState([]);
+  const [loadingPending, setLoadingPending] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState(null);
+  const [filterPendingQuery, setFilterPendingQuery] = useState('');
+  const [previewMedia, setPreviewMedia] = useState(null); // { url, type }
+
+  // Helper untuk ekstrak UID dari field Firestore
+  const extractUid = (field) => {
+    if (!field) return null;
+    if (typeof field === 'string') return field.replace(/^\/?users\//, '');
+    if (field.id) return field.id;
+    if (field.path) {
+      const parts = field.path.split('/');
+      return parts[parts.length - 1];
+    }
+    return null;
+  };
+
+  // Helper format tanggal piket
+  const formatPiketDate = (dateObj) => {
+    if (!dateObj || isNaN(dateObj.getTime())) return '-';
+    return dateObj.toLocaleDateString('id-ID', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }) + ' WIB';
+  };
+
+  // Fetch daftar piket milik user aktif yang belum disetujui (verification == false)
+  const fetchPendingPikets = useCallback(async () => {
+    const currentUid = auth.currentUser?.uid;
+    if (!currentUid) return;
+
+    setLoadingPending(true);
+    try {
+      // 1. Ambil seluruh user untuk lookup nama laporTo
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const userMap = new Map();
+      usersSnap.forEach(d => {
+        userMap.set(d.id, { id: d.id, ...d.data() });
+      });
+
+      // 2. Ambil seluruh data piket
+      const piketSnap = await getDocs(collection(db, 'piket'));
+      const list = [];
+
+      piketSnap.forEach(d => {
+        const data = d.data();
+        const userPiketId = extractUid(data.userPiket);
+
+        // Hanya piket yang dibuat oleh user saat ini dan belum diverifikasi
+        if (userPiketId === currentUid && data.verification !== true) {
+          let reportDate = null;
+          const rawDate = data.timestamp || data.createdAt;
+          if (rawDate) {
+            if (typeof rawDate.toDate === 'function') {
+              reportDate = rawDate.toDate();
+            } else {
+              reportDate = new Date(rawDate);
+            }
+          }
+
+          const laporToUid = extractUid(data.laporTo);
+          const laporToUserData = laporToUid ? userMap.get(laporToUid) : null;
+
+          let buktiList = [];
+          if (Array.isArray(data.buktiLink)) {
+            buktiList = data.buktiLink;
+          } else if (typeof data.buktiLink === 'string' && data.buktiLink) {
+            buktiList = [data.buktiLink];
+          }
+
+          const isRejected = data.status === 'rejected' || data.status === 'tidak_disetujui' || data.verification === 'rejected';
+
+          list.push({
+            id: d.id,
+            place: data.place || 'Piket',
+            timestamp: reportDate,
+            buktiLink: buktiList,
+            status: isRejected ? 'rejected' : 'pending',
+            rejectionNote: data.rejectionNote || '',
+            laporToName: laporToUserData?.name || laporToUserData?.username || 'Pengurus',
+            laporToUsername: laporToUserData?.username || '-',
+            laporToJabatan: laporToUserData?.jabatan || '',
+            laporToAngkatan: laporToUserData?.angkatan || '-'
+          });
+        }
+      });
+
+      // Urutkan dari yang paling baru
+      list.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
+
+      setPendingPikets(list);
+      setLastRefreshed(new Date());
+    } catch (err) {
+      console.error('Gagal mengambil piket belum disetujui:', err);
+    } finally {
+      setLoadingPending(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPendingPikets();
+  }, [fetchPendingPikets]);
 
   // Derived: true if any file is still uploading
   const isUploading = fileEntries.some(f => f.status === 'uploading');
@@ -222,6 +331,11 @@ const LaporPiket = () => {
       });
 
       alert('Laporan piket berhasil dikirim!');
+      // Reset form dan refresh list pending piket
+      setPlace('');
+      setSelectedLaporToUser(null);
+      setFileEntries([]);
+      fetchPendingPikets();
       navigate('/home');
     } catch (error) {
       console.error('Gagal mengirim laporan:', error);
@@ -229,6 +343,18 @@ const LaporPiket = () => {
       setLoading(false);
     }
   };
+
+  // Filter daftar pending piket berdasarkan input
+  const filteredPendingPikets = pendingPikets.filter(item => {
+    if (!filterPendingQuery.trim()) return true;
+    const q = filterPendingQuery.toLowerCase();
+    return (
+      item.place.toLowerCase().includes(q) ||
+      item.laporToName.toLowerCase().includes(q) ||
+      item.laporToUsername.toLowerCase().includes(q) ||
+      item.laporToJabatan.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div style={{
@@ -651,6 +777,437 @@ const LaporPiket = () => {
           `}</style>
 
         </form>
+
+        {/* ========================================================================= */}
+        {/* SECTION: LIST PIKET BELUM DISETUJUI PER USER */}
+        {/* ========================================================================= */}
+        <div style={{
+          marginTop: '32px',
+          backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+          borderRadius: '16px',
+          padding: '24px',
+          border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+          borderTop: '6px solid #F97316',
+          boxShadow: isDark ? '0 4px 6px rgba(0, 0, 0, 0.4)' : '0 4px 6px rgba(0, 0, 0, 0.05)',
+          transition: 'all 0.3s ease'
+        }}>
+          {/* Header Section */}
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '16px',
+            paddingBottom: '16px',
+            borderBottom: `1px solid ${isDark ? '#4A2E1E' : '#F3F4F6'}`
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  padding: '6px',
+                  borderRadius: '8px',
+                  backgroundColor: isDark ? '#431407' : '#FFEDD5',
+                  color: '#F97316',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Clock size={20} />
+                </div>
+                <h3 style={{
+                  margin: 0,
+                  fontSize: '1.15rem',
+                  fontWeight: 800,
+                  color: isDark ? '#FFFFFF' : '#1C1C1E'
+                }}>
+                  Piket Belum Disetujui
+                </h3>
+              </div>
+
+              <div style={{
+                marginTop: '6px',
+                fontSize: '0.85rem',
+                color: isDark ? '#FED7AA' : '#6B7280',
+                fontWeight: 600
+              }}>
+                <span>Daftar laporan piket Anda yang sedang menunggu verifikasi.</span>
+                {lastRefreshed && (
+                  <span style={{ opacity: 0.8, fontSize: '0.8rem', display: 'block', marginTop: '2px' }}>
+                    • Update: {lastRefreshed.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Total Badge & Refresh Button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                padding: '6px 12px',
+                backgroundColor: isDark ? '#431407' : '#FFF7ED',
+                border: `1px solid ${isDark ? '#EA580C' : '#FDBA74'}`,
+                borderRadius: '20px',
+                color: isDark ? '#FDBA74' : '#C2410C',
+                fontWeight: 800,
+                fontSize: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <AlertCircle size={14} />
+                <span>{pendingPikets.length} Menunggu</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={fetchPendingPikets}
+                disabled={loadingPending}
+                title="Segarkan daftar"
+                style={{
+                  padding: '8px 14px',
+                  backgroundColor: isDark ? '#3D291C' : '#F3F4F6',
+                  color: isDark ? '#FED7AA' : '#4B5563',
+                  border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+                  borderRadius: '12px',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  cursor: loadingPending ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease',
+                  opacity: loadingPending ? 0.7 : 1
+                }}
+                onMouseEnter={(e) => {
+                  if (!loadingPending) e.currentTarget.style.backgroundColor = isDark ? '#4A2E1E' : '#E5E7EB';
+                }}
+                onMouseLeave={(e) => {
+                  if (!loadingPending) e.currentTarget.style.backgroundColor = isDark ? '#3D291C' : '#F3F4F6';
+                }}
+              >
+                <RotateCw size={15} style={{ animation: loadingPending ? 'spin 0.8s linear infinite' : 'none' }} />
+                <span>{loadingPending ? 'Memuat...' : 'Refresh'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Filter Search jika data lebih dari 3 */}
+          {pendingPikets.length > 3 && (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
+                border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+                borderRadius: '10px',
+                padding: '8px 12px'
+              }}>
+                <Search size={16} color={isDark ? '#FED7AA' : '#9CA3AF'} />
+                <input
+                  type="text"
+                  value={filterPendingQuery}
+                  onChange={(e) => setFilterPendingQuery(e.target.value)}
+                  placeholder="Cari tempat atau penerima laporan..."
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: '0.85rem',
+                    color: isDark ? '#FFFFFF' : '#1F2937',
+                    fontWeight: 600
+                  }}
+                />
+                {filterPendingQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterPendingQuery('')}
+                    style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: 0 }}
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Body Content */}
+          {loadingPending ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '32px 16px',
+              color: isDark ? '#FED7AA' : '#6B7280'
+            }}>
+              <RotateCw size={24} style={{ animation: 'spin 0.8s linear infinite', margin: '0 auto 12px auto', display: 'block', color: '#F97316' }} />
+              <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Memuat daftar piket...</p>
+            </div>
+          ) : filteredPendingPikets.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '32px 16px',
+              backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
+              borderRadius: '12px',
+              border: `1px dashed ${isDark ? '#4A2E1E' : '#E5E7EB'}`
+            }}>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                backgroundColor: isDark ? '#2D1D13' : '#ECFDF5',
+                color: '#10B981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px auto'
+              }}>
+                <CheckCircle size={22} />
+              </div>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#FFFFFF' : '#1F2937' }}>
+                {filterPendingQuery ? 'Piket Tidak Ditemukan' : 'Tidak Ada Piket Pending'}
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: isDark ? '#FED7AA' : '#6B7280' }}>
+                {filterPendingQuery
+                  ? 'Coba gunakan kata kunci pencarian yang lain.'
+                  : 'Semua laporan piket yang Anda kirim telah disetujui atau belum ada laporan baru.'}
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {filteredPendingPikets.map((item, index) => (
+                <div
+                  key={item.id || index}
+                  style={{
+                    padding: '16px',
+                    backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
+                    border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+                    borderLeft: item.status === 'rejected' ? '6px solid #EF4444' : '6px solid #F59E0B',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {/* Row 1: Tempat & Status Badge */}
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    gap: '10px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MapPin size={18} color="#F97316" style={{ flexShrink: 0 }} />
+                      <span style={{
+                        fontSize: '1rem',
+                        fontWeight: 800,
+                        color: isDark ? '#FFFFFF' : '#1F2937'
+                      }}>
+                        {item.place}
+                      </span>
+                    </div>
+
+                    {item.status === 'rejected' ? (
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        backgroundColor: isDark ? '#4C1A1A' : '#FEE2E2',
+                        border: `1px solid ${isDark ? '#DC2626' : '#FCA5A5'}`,
+                        color: isDark ? '#FCA5A5' : '#DC2626',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        flexShrink: 0
+                      }}>
+                        <AlertCircle size={12} />
+                        <span>Tidak Disetujui</span>
+                      </div>
+                    ) : (
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        backgroundColor: isDark ? '#451A03' : '#FFFBEB',
+                        border: `1px solid ${isDark ? '#D97706' : '#FDE68A'}`,
+                        color: isDark ? '#FCD34D' : '#B45309',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        flexShrink: 0
+                      }}>
+                        <Clock size={12} />
+                        <span>Menunggu TTD</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Catatan Penolakan jika ada */}
+                  {item.status === 'rejected' && item.rejectionNote && (
+                    <div style={{
+                      padding: '8px 12px',
+                      backgroundColor: isDark ? '#3C1C1C' : '#FEF2F2',
+                      border: `1px solid ${isDark ? '#7F1D1D' : '#FCA5A5'}`,
+                      borderRadius: '8px',
+                      color: isDark ? '#FCA5A5' : '#B91C1C',
+                      fontSize: '0.8rem',
+                      fontWeight: 600
+                    }}>
+                      <strong>Catatan Pengurus:</strong> {item.rejectionNote}
+                    </div>
+                  )}
+
+                  {/* Row 2: Lapor Kepada & Waktu */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: '8px',
+                    fontSize: '0.85rem',
+                    color: isDark ? '#FED7AA' : '#4B5563'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <User size={14} color={isDark ? '#FB923C' : '#F97316'} />
+                      <span>
+                        Lapor ke: <strong style={{ color: isDark ? '#FFFFFF' : '#111827' }}>@{item.laporToUsername}</strong>
+                        {item.laporToJabatan && ` (${item.laporToJabatan})`}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Calendar size={14} color={isDark ? '#FB923C' : '#F97316'} />
+                      <span>{formatPiketDate(item.timestamp)}</span>
+                    </div>
+                  </div>
+
+                  {/* Row 3: Bukti Foto / Video Thumbnails */}
+                  {item.buktiLink && item.buktiLink.length > 0 && (
+                    <div style={{
+                      paddingTop: '8px',
+                      borderTop: `1px dashed ${isDark ? '#3D291C' : '#E5E7EB'}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      flexWrap: 'wrap'
+                    }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <FileImage size={13} /> Bukti:
+                      </span>
+                      {item.buktiLink.map((url, imgIdx) => {
+                        const isVideo = url.includes('.mp4') || url.includes('.webm') || url.includes('.mov') || url.includes('video');
+                        return (
+                          <div
+                            key={imgIdx}
+                            onClick={() => setPreviewMedia({ url, type: isVideo ? 'video' : 'image' })}
+                            style={{
+                              position: 'relative',
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              cursor: 'pointer',
+                              border: `1.5px solid ${isDark ? '#4A2E1E' : '#D1D5DB'}`,
+                              backgroundColor: '#000000'
+                            }}
+                            title="Klik untuk melihat bukti"
+                          >
+                            {isVideo ? (
+                              <video src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <img src={url} alt="bukti" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Modal Pratinjau Media */}
+        {previewMedia && (
+          <div
+            onClick={() => setPreviewMedia(null)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.85)',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px'
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'relative',
+                maxWidth: '90vw',
+                maxHeight: '85vh',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setPreviewMedia(null)}
+                style={{
+                  position: 'absolute',
+                  top: '-44px',
+                  right: 0,
+                  backgroundColor: 'white',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+                }}
+              >
+                <X size={20} color="#000000" />
+              </button>
+
+              {previewMedia.type === 'video' ? (
+                <video
+                  src={previewMedia.url}
+                  controls
+                  autoPlay
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '80vh',
+                    borderRadius: '12px',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
+                  }}
+                />
+              ) : (
+                <img
+                  src={previewMedia.url}
+                  alt="Pratinjau Bukti"
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '80vh',
+                    borderRadius: '12px',
+                    objectFit: 'contain',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
