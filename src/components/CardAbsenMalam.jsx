@@ -11,7 +11,7 @@ const CardAbsenMalam = ({ userData, theme, navigate }) => {
 
   const isCalon = (userData?.statusPenghuni || userData?.status_penghuni) === 'CALON';
 
-  // Time-based lock for Form: only open 22:00-22:30 WIB
+  // Time-based lock for Form: only open 21:30-22:00 WIB
   const [isOpen, setIsOpen] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
 
@@ -22,9 +22,9 @@ const CardAbsenMalam = ({ userData, theme, navigate }) => {
       const minutes = now.getMinutes();
       const totalMinutes = hours * 60 + minutes;
 
-      // 22:00 = 1320 minutes, 22:30 = 1350 minutes
-      const openTime = 22 * 60; // 22:00
-      const closeTime = 22 * 60 + 30; // 22:30
+      // 21:30 = 1290 minutes, 22:00 = 1320 minutes
+      const openTime = 21 * 60 + 30; // 21:30
+      const closeTime = 22 * 60; // 22:00
 
       if (totalMinutes >= openTime && totalMinutes < closeTime) {
         setIsOpen(true);
@@ -106,13 +106,13 @@ const CardAbsenMalam = ({ userData, theme, navigate }) => {
             }}
           >
             <Clock size={12} />
-            <span>{isOpen ? `Buka (${timeLeft})` : `Buka 22:00 WIB`}</span>
+            <span>{isOpen ? `Buka (${timeLeft})` : `Buka 21:30 WIB`}</span>
           </div>
         </div>
 
         {/* Action Buttons Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: !isCalon ? '1fr 1fr' : '1fr', gap: '10px' }}>
-          {/* Button 1: Isi Form (Only enabled/open 22:00-22:30, or clickable to see timer) */}
+          {/* Button 1: Isi Form (Only enabled/open 21:30-22:00, or clickable to see timer) */}
           <button
             onClick={() => navigate('/form-absen-malam')}
             style={{
@@ -141,7 +141,7 @@ const CardAbsenMalam = ({ userData, theme, navigate }) => {
             }}
           >
             {isOpen ? <MapPin size={16} /> : <Lock size={16} />}
-            <span>{isOpen ? 'Isi Form Absen' : 'Form (22:00)'}</span>
+            <span>{isOpen ? 'Isi Form Absen' : 'Form (21:30)'}</span>
           </button>
 
           {/* Button 2: Verifikasi (Always open 24/7 for all non-CALON residents) */}
