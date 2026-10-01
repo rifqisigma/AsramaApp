@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, ShieldCheck, ClipboardCheck, Lock, Clock } from 'lucide-react';
+import { MapPin, ShieldCheck, ClipboardCheck, Lock, Clock, Users } from 'lucide-react';
 
 const CardAbsenMalam = ({ userData, theme, navigate }) => {
   const isDark = theme === 'dark';
@@ -9,7 +9,7 @@ const CardAbsenMalam = ({ userData, theme, navigate }) => {
   const titleColor = isDark ? '#FFFFFF' : '#1C1C1E';
   const descColor = isDark ? '#D1D5DB' : '#6B7280';
 
-  const isCalon = (userData?.statusPenghuni || userData?.status_penghuni) === 'CALON';
+  const isCalon = ((userData?.statusPenghuni || userData?.status_penghuni || '').toUpperCase() === 'CALON') && (!userData?.jabatan || userData.jabatan.trim() === '');
 
   // Time-based lock for Form: only open 21:30-22:00 WIB
   const [isOpen, setIsOpen] = useState(false);
@@ -111,53 +111,21 @@ const CardAbsenMalam = ({ userData, theme, navigate }) => {
         </div>
 
         {/* Action Buttons Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: !isCalon ? '1fr 1fr' : '1fr', gap: '10px' }}>
-          {/* Button 1: Isi Form (Only enabled/open 21:30-22:00, or clickable to see timer) */}
-          <button
-            onClick={() => navigate('/form-absen-malam')}
-            style={{
-              padding: '13px',
-              backgroundColor: isOpen ? '#F97316' : isDark ? '#3D291C' : '#FFEDD5',
-              color: isOpen ? 'white' : isDark ? '#FED7AA' : '#C2410C',
-              border: `2px solid ${isOpen ? '#EA580C' : isDark ? '#4A2E1E' : '#FDBA74'}`,
-              borderRadius: '16px',
-              fontSize: '0.88rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: isOpen ? '0 4px 0 #EA580C' : isDark ? '0 3px 0 #4A2E1E' : '0 3px 0 #FDBA74',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              transition: 'transform 0.1s, box-shadow 0.1s'
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.transform = 'translateY(2px)';
-              e.currentTarget.style.boxShadow = isOpen ? '0 1px 0 #EA580C' : 'none';
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform = 'translateY(0px)';
-              e.currentTarget.style.boxShadow = isOpen ? '0 4px 0 #EA580C' : isDark ? '0 3px 0 #4A2E1E' : '0 3px 0 #FDBA74';
-            }}
-          >
-            {isOpen ? <MapPin size={16} /> : <Lock size={16} />}
-            <span>{isOpen ? 'Isi Form Absen' : 'Form (21:30)'}</span>
-          </button>
-
-          {/* Button 2: Verifikasi (Always open 24/7 for all non-CALON residents) */}
-          {!isCalon && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: !isCalon ? '1fr 1fr' : '1fr', gap: '10px' }}>
+            {/* Button 1: Isi Form (Only enabled/open 21:30-22:00, or clickable to see timer) */}
             <button
-              onClick={() => navigate('/verification-absen-malam')}
+              onClick={() => navigate('/form-absen-malam')}
               style={{
                 padding: '13px',
-                backgroundColor: '#3B82F6',
-                color: 'white',
-                border: '2px solid #2563EB',
+                backgroundColor: isOpen ? '#F97316' : isDark ? '#3D291C' : '#FFEDD5',
+                color: isOpen ? 'white' : isDark ? '#FED7AA' : '#C2410C',
+                border: `2px solid ${isOpen ? '#EA580C' : isDark ? '#4A2E1E' : '#FDBA74'}`,
                 borderRadius: '16px',
                 fontSize: '0.88rem',
                 fontWeight: 800,
                 cursor: 'pointer',
-                boxShadow: '0 4px 0 #1D4ED8',
+                boxShadow: isOpen ? '0 4px 0 #EA580C' : isDark ? '0 3px 0 #4A2E1E' : '0 3px 0 #FDBA74',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -166,15 +134,84 @@ const CardAbsenMalam = ({ userData, theme, navigate }) => {
               }}
               onMouseDown={(e) => {
                 e.currentTarget.style.transform = 'translateY(2px)';
-                e.currentTarget.style.boxShadow = '0 1px 0 #1D4ED8';
+                e.currentTarget.style.boxShadow = isOpen ? '0 1px 0 #EA580C' : 'none';
               }}
               onMouseUp={(e) => {
                 e.currentTarget.style.transform = 'translateY(0px)';
-                e.currentTarget.style.boxShadow = '0 4px 0 #1D4ED8';
+                e.currentTarget.style.boxShadow = isOpen ? '0 4px 0 #EA580C' : isDark ? '0 3px 0 #4A2E1E' : '0 3px 0 #FDBA74';
               }}
             >
-              <ShieldCheck size={16} />
-              <span>Verifikasi (24 Jam)</span>
+              {isOpen ? <MapPin size={16} /> : <Lock size={16} />}
+              <span>{isOpen ? 'Isi Form Absen' : 'Form (21:30)'}</span>
+            </button>
+
+            {/* Button 2: Verifikasi (Always open 24/7 for all non-CALON residents) */}
+            {!isCalon && (
+              <button
+                onClick={() => navigate('/verification-absen-malam')}
+                style={{
+                  padding: '13px',
+                  backgroundColor: '#3B82F6',
+                  color: 'white',
+                  border: '2px solid #2563EB',
+                  borderRadius: '16px',
+                  fontSize: '0.88rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 0 #1D4ED8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'transform 0.1s, box-shadow 0.1s'
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = 'translateY(2px)';
+                  e.currentTarget.style.boxShadow = '0 1px 0 #1D4ED8';
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0px)';
+                  e.currentTarget.style.boxShadow = '0 4px 0 #1D4ED8';
+                }}
+              >
+                <ShieldCheck size={16} />
+                <span>Verifikasi (24 Jam)</span>
+              </button>
+            )}
+          </div>
+
+          {/* Button 3: Monitoring Calon (Khusus penghuni tetap / pengurus) */}
+          {!isCalon && (
+            <button
+              onClick={() => navigate('/monitoring-absen-malam')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                backgroundColor: isDark ? '#4C1D24' : '#FFE4E6',
+                color: '#F43F5E',
+                border: `2px solid ${isDark ? '#9F1239' : '#FDA4AF'}`,
+                borderRadius: '16px',
+                fontSize: '0.88rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: isDark ? '0 4px 0 #9F1239' : '0 4px 0 #FDA4AF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'transform 0.1s, box-shadow 0.1s'
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = 'translateY(2px)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = 'translateY(0px)';
+                e.currentTarget.style.boxShadow = isDark ? '0 4px 0 #9F1239' : '0 4px 0 #FDA4AF';
+              }}
+            >
+              <Users size={16} />
+              <span>📊 Monitoring Absen Calon</span>
             </button>
           )}
         </div>

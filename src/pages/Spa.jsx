@@ -98,7 +98,9 @@ const Spa = () => {
     setTimeout(() => setCopiedText(''), 2000);
   };
 
-  const isBendahara = userData?.jabatan?.toLowerCase() === 'bendahara';
+  const userRole = (userData?.jabatan || '').toLowerCase().trim();
+  const allowedMonitoringRoles = ['bendahara', 'sekretaris', 'wakil presiden', 'wapres', 'presiden'];
+  const canAccessMonitoring = allowedMonitoringRoles.includes(userRole);
 
   if (loading) {
     return (
@@ -198,8 +200,8 @@ const Spa = () => {
         </div>
       </div>
 
-      {/* Golden Staff Banner for Bendahara */}
-      {isBendahara && (
+      {/* Golden Staff Banner for Staff (Bendahara, Sekretaris, Wapres, Presiden) */}
+      {canAccessMonitoring && (
         <div 
           onClick={() => navigate('/accepting-spa')}
           style={{
@@ -213,7 +215,7 @@ const Spa = () => {
             gap: '12px',
             cursor: 'pointer',
             boxShadow: isDark ? '0 6px 0 #2A1C12' : '0 6px 0 #FEF08A',
-            marginBottom: '28px',
+            marginBottom: '24px',
             transition: 'transform 0.15s ease'
           }}
           onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
@@ -234,10 +236,10 @@ const Spa = () => {
             </div>
             <div>
               <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: isDark ? '#F59E0B' : '#A16207' }}>
-                Halaman Bendahara
+                Monitoring & Verifikasi SPA
               </h4>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', fontWeight: 700, color: isDark ? '#FCD34D' : '#CA8A04' }}>
-                Ada pembayaran yang butuh verifikasi
+                Pantau seluruh status konfirmasi & data spreadsheet
               </p>
             </div>
           </div>

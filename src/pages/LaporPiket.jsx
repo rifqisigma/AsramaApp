@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { auth, db, storage } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { getCookie, setCookie, getWeeklyResetTime } from '../utils/cookie';
 import { getGlobalWibDate } from '../utils/time';
 import { collection, getDocs, doc, addDoc, getDoc, query, where } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { ArrowLeft, Upload, CheckCircle, Search, ExternalLink, Loader, Clock, RotateCw, MapPin, User, FileImage, X, AlertCircle, Calendar } from 'lucide-react';
+import { ArrowLeft, Upload, CheckCircle, Search, ExternalLink, Loader, Clock, RotateCw, MapPin, User, FileImage, X, AlertCircle, Calendar, Sparkles, CheckCircle2, Users } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
@@ -15,8 +16,17 @@ const LaporPiket = () => {
   const { addNotification } = useNotification();
   const isDark = theme === 'dark';
 
+  const [currentUser, setCurrentUser] = useState(auth.currentUser);
   const [loading, setLoading] = useState(false);
   const [pageLinks, setPageLinks] = useState([]);
+
+  // Auth listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Fetch links dari databaseSPS dengan filter header == 'piket'
   useEffect(() => {
@@ -46,21 +56,35 @@ const LaporPiket = () => {
   const [fileEntries, setFileEntries] = useState([]);
   const fileInputRef = useRef(null);
 
-  // State untuk List Piket Belum Disetujui
+  // State untuk Tab List & Data Piket
+  const [listTab, setListTab] = useState('TODAY_ALL'); // 'TODAY_ALL' | 'MY_PENDING'
+  const [myPikets, setMyPikets] = useState([]);
   const [pendingPikets, setPendingPikets] = useState([]);
+  const [todayPikets, setTodayPikets] = useState([]);
   const [loadingPending, setLoadingPending] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState(null);
+  
+  // Filters
   const [filterPendingQuery, setFilterPendingQuery] = useState('');
+  const [filterPendingStatus, setFilterPendingStatus] = useState('ALL'); // 'ALL' | 'pending' | 'verified' | 'rejected'
+  const [filterTodayQuery, setFilterTodayQuery] = useState('');
+  const [filterTodayStatus, setFilterTodayStatus] = useState('ALL'); // 'ALL' | 'verified' | 'pending'
+
   const [previewMedia, setPreviewMedia] = useState(null); // { url, type }
 
-  // Helper untuk ekstrak UID dari field Firestore
+  // Helper untuk ekstrak UID dari field Firestore (mendukung DocRef, string, object)
   const extractUid = (field) => {
     if (!field) return null;
-    if (typeof field === 'string') return field.replace(/^\/?users\//, '');
-    if (field.id) return field.id;
+    if (typeof field === 'string') return field.replace(/^\/?users\//, '').trim();
+    if (field.id) return String(field.id).trim();
+    if (field.uid) return String(field.uid).trim();
+    if (field._key?.path?.segments) {
+      const segs = field._key.path.segments;
+      return String(segs[segs.length - 1]).trim();
+    }
     if (field.path) {
       const parts = field.path.split('/');
-      return parts[parts.length - 1];
+      return String(parts[parts.length - 1]).trim();
     }
     return null;
   };
@@ -78,14 +102,28 @@ const LaporPiket = () => {
     }) + ' WIB';
   };
 
-  // Fetch daftar piket milik user aktif yang belum disetujui (verification == false)
-  const fetchPendingPikets = useCallback(async () => {
-    const currentUid = auth.currentUser?.uid;
-    if (!currentUid) return;
+  // Helper cek apakah tanggal adalah hari ini (WIB)
+  const isTodayWib = (dateObj) => {
+    if (!dateObj || isNaN(dateObj.getTime())) return false;
+    const now = new Date();
+    const options = { timeZone: 'Asia/Jakarta', year: 'numeric', month: 'numeric', day: 'numeric' };
+    try {
+      return dateObj.toLocaleDateString('id-ID', options) === now.toLocaleDateString('id-ID', options);
+    } catch {
+      return (
+        dateObj.getFullYear() === now.getFullYear() &&
+        dateObj.getMonth() === now.getMonth() &&
+        dateObj.getDate() === now.getDate()
+      );
+    }
+  };
 
+  // Fetch seluruh data piket (piket milik user login & semua piket hari ini)
+  const fetchAllPiketLists = useCallback(async () => {
+    const currentUid = (auth.currentUser?.uid || currentUser?.uid || '').trim();
     setLoadingPending(true);
     try {
-      // 1. Ambil seluruh user untuk lookup nama laporTo
+      // 1. Ambil seluruh user untuk lookup info pembuat piket dan laporTo
       const usersSnap = await getDocs(collection(db, 'users'));
       const userMap = new Map();
       usersSnap.forEach(d => {
@@ -94,66 +132,102 @@ const LaporPiket = () => {
 
       // 2. Ambil seluruh data piket
       const piketSnap = await getDocs(collection(db, 'piket'));
-      const list = [];
+      const myList = [];
+      const pendingList = [];
+      const todayList = [];
 
       piketSnap.forEach(d => {
         const data = d.data();
         const userPiketId = extractUid(data.userPiket);
+        const userPiketData = userPiketId ? userMap.get(userPiketId) : null;
 
-        // Hanya piket yang dibuat oleh user saat ini dan belum diverifikasi
-        if (userPiketId === currentUid && data.verification !== true) {
-          let reportDate = null;
-          const rawDate = data.timestamp || data.createdAt;
-          if (rawDate) {
-            if (typeof rawDate.toDate === 'function') {
-              reportDate = rawDate.toDate();
-            } else {
-              reportDate = new Date(rawDate);
-            }
+        let reportDate = null;
+        const rawDate = data.timestamp || data.createdAt;
+        if (rawDate) {
+          if (typeof rawDate.toDate === 'function') {
+            reportDate = rawDate.toDate();
+          } else {
+            reportDate = new Date(rawDate);
           }
+        }
 
-          const laporToUid = extractUid(data.laporTo);
-          const laporToUserData = laporToUid ? userMap.get(laporToUid) : null;
+        const laporToUid = extractUid(data.laporTo);
+        const laporToUserData = laporToUid ? userMap.get(laporToUid) : null;
 
-          let buktiList = [];
-          if (Array.isArray(data.buktiLink)) {
-            buktiList = data.buktiLink;
-          } else if (typeof data.buktiLink === 'string' && data.buktiLink) {
-            buktiList = [data.buktiLink];
-          }
+        let buktiList = [];
+        if (Array.isArray(data.buktiLink)) {
+          buktiList = data.buktiLink;
+        } else if (typeof data.buktiLink === 'string' && data.buktiLink) {
+          buktiList = [data.buktiLink];
+        }
 
-          const isRejected = data.status === 'rejected' || data.status === 'tidak_disetujui' || data.verification === 'rejected';
+        const isRejected = data.status === 'rejected' || data.status === 'tidak_disetujui' || data.verification === 'rejected';
+        const isVerified = data.verification === true;
 
-          list.push({
-            id: d.id,
-            place: data.place || 'Piket',
-            timestamp: reportDate,
-            buktiLink: buktiList,
-            status: isRejected ? 'rejected' : 'pending',
-            rejectionNote: data.rejectionNote || '',
-            laporToName: laporToUserData?.name || laporToUserData?.username || 'Pengurus',
-            laporToUsername: laporToUserData?.username || '-',
-            laporToJabatan: laporToUserData?.jabatan || '',
-            laporToAngkatan: laporToUserData?.angkatan || '-'
-          });
+        const piketItem = {
+          id: d.id,
+          place: data.place || 'Piket',
+          timestamp: reportDate,
+          buktiLink: buktiList,
+          verification: isVerified,
+          status: isRejected ? 'rejected' : (isVerified ? 'verified' : 'pending'),
+          rejectionNote: data.rejectionNote || data.rejection_reason || data.alasan || '',
+          userPiketId: userPiketId,
+          userPiketName: userPiketData?.name || userPiketData?.username || 'Penghuni Asrama',
+          userPiketUsername: userPiketData?.username || 'penghuni',
+          userPiketAngkatan: userPiketData?.angkatan || '?',
+          userPiketProdi: userPiketData?.prodi || '',
+          userPiketFoto: userPiketData?.fotoProfil || '',
+          userPiketJabatan: userPiketData?.jabatan || '',
+          laporToName: laporToUserData?.name || laporToUserData?.username || 'Pengurus',
+          laporToUsername: laporToUserData?.username || '-',
+          laporToJabatan: laporToUserData?.jabatan || '',
+          laporToAngkatan: laporToUserData?.angkatan || '-'
+        };
+
+        // A. Cek apakah ini laporan piket milik user login (Identik dengan Dashboard Home)
+        const isMyPiket = Boolean(
+          currentUid && (
+            (data.userPiket && (data.userPiket.id === currentUid || String(data.userPiket.id).trim() === currentUid)) ||
+            (userPiketId && userPiketId === currentUid) ||
+            (typeof data.userPiket === 'string' && data.userPiket.replace(/^\/?users\//, '').trim() === currentUid) ||
+            (data.userId && String(data.userId).trim() === currentUid) ||
+            (data.userPiketId && String(data.userPiketId).trim() === currentUid) ||
+            (data.uid && String(data.uid).trim() === currentUid) ||
+            (data.user && String(data.user).trim() === currentUid)
+          )
+        );
+
+        if (isMyPiket && !isVerified) {
+          myList.push(piketItem);
+          pendingList.push(piketItem);
+        }
+
+        // B. Piket Siapa Saja Yang Sudah Piket Hari Ini
+        if (isTodayWib(reportDate)) {
+          todayList.push(piketItem);
         }
       });
 
       // Urutkan dari yang paling baru
-      list.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
+      myList.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
+      pendingList.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
+      todayList.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
 
-      setPendingPikets(list);
+      setMyPikets(myList);
+      setPendingPikets(pendingList);
+      setTodayPikets(todayList);
       setLastRefreshed(new Date());
     } catch (err) {
-      console.error('Gagal mengambil piket belum disetujui:', err);
+      console.error('Gagal mengambil daftar piket:', err);
     } finally {
       setLoadingPending(false);
     }
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
-    fetchPendingPikets();
-  }, [fetchPendingPikets]);
+    fetchAllPiketLists();
+  }, [fetchAllPiketLists]);
 
   // Derived: true if any file is still uploading
   const isUploading = fileEntries.some(f => f.status === 'uploading');
@@ -335,7 +409,7 @@ const LaporPiket = () => {
       setPlace('');
       setSelectedLaporToUser(null);
       setFileEntries([]);
-      fetchPendingPikets();
+      fetchAllPiketLists();
       navigate('/home');
     } catch (error) {
       console.error('Gagal mengirim laporan:', error);
@@ -344,16 +418,44 @@ const LaporPiket = () => {
     }
   };
 
-  // Filter daftar pending piket berdasarkan input
-  const filteredPendingPikets = pendingPikets.filter(item => {
+  // Filter daftar piket belum disetujui milik user login (Menunggu & Tidak Disetujui)
+  const filteredMyPikets = myPikets.filter(item => {
+    // Filter status
+    if (filterPendingStatus === 'pending' && item.status === 'rejected') return false;
+    if (filterPendingStatus === 'rejected' && item.status !== 'rejected') return false;
+
+    // Filter text pencarian
     if (!filterPendingQuery.trim()) return true;
-    const q = filterPendingQuery.toLowerCase();
+    const q = filterPendingQuery.toLowerCase().trim();
     return (
-      item.place.toLowerCase().includes(q) ||
-      item.laporToName.toLowerCase().includes(q) ||
-      item.laporToUsername.toLowerCase().includes(q) ||
-      item.laporToJabatan.toLowerCase().includes(q)
+      (item.place || '').toLowerCase().includes(q) ||
+      (item.laporToName || '').toLowerCase().includes(q) ||
+      (item.laporToUsername || '').toLowerCase().includes(q) ||
+      (item.laporToJabatan || '').toLowerCase().includes(q)
     );
+  });
+
+  // Filter daftar piket seluruh user hari ini
+  const filteredTodayPikets = todayPikets.filter(item => {
+    // Filter status
+    if (filterTodayStatus === 'verified' && !item.verification) return false;
+    if (filterTodayStatus === 'pending' && (item.verification || item.status === 'rejected')) return false;
+    if (filterTodayStatus === 'rejected' && item.status !== 'rejected') return false;
+
+    // Filter search text (nama siswa, angkatan, tempat piket, atau laporTo)
+    if (filterTodayQuery.trim()) {
+      const q = filterTodayQuery.toLowerCase().trim();
+      const uName = (item.userPiketName || '').toLowerCase();
+      const uUname = (item.userPiketUsername || '').toLowerCase();
+      const uAngk = String(item.userPiketAngkatan || '').toLowerCase();
+      const uPlace = (item.place || '').toLowerCase();
+      const lToName = (item.laporToName || '').toLowerCase();
+      const lToUname = (item.laporToUsername || '').toLowerCase();
+      if (!uName.includes(q) && !uUname.includes(q) && !uAngk.includes(q) && !uPlace.includes(q) && !lToName.includes(q) && !lToUname.includes(q)) {
+        return false;
+      }
+    }
+    return true;
   });
 
   return (
@@ -779,353 +881,897 @@ const LaporPiket = () => {
         </form>
 
         {/* ========================================================================= */}
-        {/* SECTION: LIST PIKET BELUM DISETUJUI PER USER */}
+        {/* SECTION: TABS DAFTAR PIKET (HARI INI & MILIK SAYA) */}
         {/* ========================================================================= */}
         <div style={{
           marginTop: '32px',
           backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
-          borderRadius: '16px',
+          borderRadius: '24px',
           padding: '24px',
           border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
           borderTop: '6px solid #F97316',
-          boxShadow: isDark ? '0 4px 6px rgba(0, 0, 0, 0.4)' : '0 4px 6px rgba(0, 0, 0, 0.05)',
+          boxShadow: isDark ? '0 6px 0 #4A2E1E' : '0 6px 0 #FFEDD5, 0 10px 15px rgba(249, 115, 22, 0.05)',
           transition: 'all 0.3s ease'
         }}>
-          {/* Header Section */}
+
+          {/* 🔘 Segmented Tab Control (Duolingo 3D Button Style) */}
           <div style={{
             display: 'flex',
-            flexWrap: 'wrap',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '12px',
-            marginBottom: '16px',
-            paddingBottom: '16px',
-            borderBottom: `1px solid ${isDark ? '#4A2E1E' : '#F3F4F6'}`
+            gap: '10px',
+            marginBottom: '20px'
           }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{
-                  padding: '6px',
-                  borderRadius: '8px',
-                  backgroundColor: isDark ? '#431407' : '#FFEDD5',
-                  color: '#F97316',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <Clock size={20} />
-                </div>
-                <h3 style={{
-                  margin: 0,
-                  fontSize: '1.15rem',
-                  fontWeight: 800,
-                  color: isDark ? '#FFFFFF' : '#1C1C1E'
-                }}>
-                  Piket Belum Disetujui
-                </h3>
-              </div>
-
-              <div style={{
-                marginTop: '6px',
-                fontSize: '0.85rem',
-                color: isDark ? '#FED7AA' : '#6B7280',
-                fontWeight: 600
-              }}>
-                <span>Daftar laporan piket Anda yang sedang menunggu verifikasi.</span>
-                {lastRefreshed && (
-                  <span style={{ opacity: 0.8, fontSize: '0.8rem', display: 'block', marginTop: '2px' }}>
-                    • Update: {lastRefreshed.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Total Badge & Refresh Button */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{
-                padding: '6px 12px',
-                backgroundColor: isDark ? '#431407' : '#FFF7ED',
-                border: `1px solid ${isDark ? '#EA580C' : '#FDBA74'}`,
-                borderRadius: '20px',
-                color: isDark ? '#FDBA74' : '#C2410C',
-                fontWeight: 800,
-                fontSize: '0.85rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                <AlertCircle size={14} />
-                <span>{pendingPikets.length} Menunggu</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={fetchPendingPikets}
-                disabled={loadingPending}
-                title="Segarkan daftar"
-                style={{
-                  padding: '8px 14px',
-                  backgroundColor: isDark ? '#3D291C' : '#F3F4F6',
-                  color: isDark ? '#FED7AA' : '#4B5563',
-                  border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
-                  borderRadius: '12px',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  cursor: loadingPending ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'all 0.2s ease',
-                  opacity: loadingPending ? 0.7 : 1
-                }}
-                onMouseEnter={(e) => {
-                  if (!loadingPending) e.currentTarget.style.backgroundColor = isDark ? '#4A2E1E' : '#E5E7EB';
-                }}
-                onMouseLeave={(e) => {
-                  if (!loadingPending) e.currentTarget.style.backgroundColor = isDark ? '#3D291C' : '#F3F4F6';
-                }}
-              >
-                <RotateCw size={15} style={{ animation: loadingPending ? 'spin 0.8s linear infinite' : 'none' }} />
-                <span>{loadingPending ? 'Memuat...' : 'Refresh'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Quick Filter Search jika data lebih dari 3 */}
-          {pendingPikets.length > 3 && (
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
-                border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
-                borderRadius: '10px',
-                padding: '8px 12px'
-              }}>
-                <Search size={16} color={isDark ? '#FED7AA' : '#9CA3AF'} />
-                <input
-                  type="text"
-                  value={filterPendingQuery}
-                  onChange={(e) => setFilterPendingQuery(e.target.value)}
-                  placeholder="Cari tempat atau penerima laporan..."
-                  style={{
-                    flex: 1,
-                    background: 'transparent',
-                    border: 'none',
-                    outline: 'none',
-                    fontSize: '0.85rem',
-                    color: isDark ? '#FFFFFF' : '#1F2937',
-                    fontWeight: 600
-                  }}
-                />
-                {filterPendingQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setFilterPendingQuery('')}
-                    style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: 0 }}
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Body Content */}
-          {loadingPending ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '32px 16px',
-              color: isDark ? '#FED7AA' : '#6B7280'
-            }}>
-              <RotateCw size={24} style={{ animation: 'spin 0.8s linear infinite', margin: '0 auto 12px auto', display: 'block', color: '#F97316' }} />
-              <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Memuat daftar piket...</p>
-            </div>
-          ) : filteredPendingPikets.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '32px 16px',
-              backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
-              borderRadius: '12px',
-              border: `1px dashed ${isDark ? '#4A2E1E' : '#E5E7EB'}`
-            }}>
-              <div style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '50%',
-                backgroundColor: isDark ? '#2D1D13' : '#ECFDF5',
-                color: '#10B981',
+            <button
+              type="button"
+              onClick={() => setListTab('TODAY_ALL')}
+              style={{
+                flex: 1,
+                padding: '12px 14px',
+                borderRadius: '16px',
+                cursor: 'pointer',
+                border: listTab === 'TODAY_ALL' 
+                  ? '2px solid #F97316' 
+                  : `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                backgroundColor: listTab === 'TODAY_ALL' 
+                  ? (isDark ? '#3D291C' : '#FFF7ED') 
+                  : (isDark ? '#1E130C' : '#FFFFFF'),
+                color: listTab === 'TODAY_ALL' ? '#F97316' : (isDark ? '#FED7AA' : '#6B7280'),
+                fontWeight: 900,
+                fontSize: '0.88rem',
+                boxShadow: listTab === 'TODAY_ALL' 
+                  ? (isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FFEDD5') 
+                  : 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                margin: '0 auto 12px auto'
+                gap: '8px',
+                transition: 'all 0.15s ease',
+                outline: 'none'
+              }}
+            >
+              <Sparkles size={16} strokeWidth={2.5} />
+              <span>Sudah Piket Hari Ini ({todayPikets.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setListTab('MY_PENDING')}
+              style={{
+                flex: 1,
+                padding: '12px 14px',
+                borderRadius: '16px',
+                cursor: 'pointer',
+                border: listTab === 'MY_PENDING' 
+                  ? '2px solid #F97316' 
+                  : `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                backgroundColor: listTab === 'MY_PENDING' 
+                  ? (isDark ? '#3D291C' : '#FFF7ED') 
+                  : (isDark ? '#1E130C' : '#FFFFFF'),
+                color: listTab === 'MY_PENDING' ? '#F97316' : (isDark ? '#FED7AA' : '#6B7280'),
+                fontWeight: 900,
+                fontSize: '0.88rem',
+                boxShadow: listTab === 'MY_PENDING' 
+                  ? (isDark ? '0 4px 0 #4A2E1E' : '0 4px 0 #FFEDD5') 
+                  : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.15s ease',
+                outline: 'none'
+              }}
+            >
+              <Clock size={16} strokeWidth={2.5} />
+              <span>Piket Saya ({pendingPikets.length})</span>
+            </button>
+          </div>
+
+          {/* ================================================================= */}
+          {/* TAB 1: DAFTAR SIAPA SAJA YANG SUDAH PIKET HARI INI */}
+          {/* ================================================================= */}
+          {listTab === 'TODAY_ALL' && (
+            <div>
+              {/* Header Section */}
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '16px',
+                paddingBottom: '16px',
+                borderBottom: `1px solid ${isDark ? '#4A2E1E' : '#F3F4F6'}`
               }}>
-                <CheckCircle size={22} />
-              </div>
-              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#FFFFFF' : '#1F2937' }}>
-                {filterPendingQuery ? 'Piket Tidak Ditemukan' : 'Tidak Ada Piket Pending'}
-              </h4>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: isDark ? '#FED7AA' : '#6B7280' }}>
-                {filterPendingQuery
-                  ? 'Coba gunakan kata kunci pencarian yang lain.'
-                  : 'Semua laporan piket yang Anda kirim telah disetujui atau belum ada laporan baru.'}
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {filteredPendingPikets.map((item, index) => (
-                <div
-                  key={item.id || index}
-                  style={{
-                    padding: '16px',
-                    backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
-                    border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
-                    borderLeft: item.status === 'rejected' ? '6px solid #EF4444' : '6px solid #F59E0B',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {/* Row 1: Tempat & Status Badge */}
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    gap: '10px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <MapPin size={18} color="#F97316" style={{ flexShrink: 0 }} />
-                      <span style={{
-                        fontSize: '1rem',
-                        fontWeight: 800,
-                        color: isDark ? '#FFFFFF' : '#1F2937'
-                      }}>
-                        {item.place}
-                      </span>
-                    </div>
-
-                    {item.status === 'rejected' ? (
-                      <div style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '4px 10px',
-                        borderRadius: '12px',
-                        backgroundColor: isDark ? '#4C1A1A' : '#FEE2E2',
-                        border: `1px solid ${isDark ? '#DC2626' : '#FCA5A5'}`,
-                        color: isDark ? '#FCA5A5' : '#DC2626',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        flexShrink: 0
-                      }}>
-                        <AlertCircle size={12} />
-                        <span>Tidak Disetujui</span>
-                      </div>
-                    ) : (
-                      <div style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '4px 10px',
-                        borderRadius: '12px',
-                        backgroundColor: isDark ? '#451A03' : '#FFFBEB',
-                        border: `1px solid ${isDark ? '#D97706' : '#FDE68A'}`,
-                        color: isDark ? '#FCD34D' : '#B45309',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        flexShrink: 0
-                      }}>
-                        <Clock size={12} />
-                        <span>Menunggu TTD</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Catatan Penolakan jika ada */}
-                  {item.status === 'rejected' && item.rejectionNote && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{
-                      padding: '8px 12px',
-                      backgroundColor: isDark ? '#3C1C1C' : '#FEF2F2',
-                      border: `1px solid ${isDark ? '#7F1D1D' : '#FCA5A5'}`,
-                      borderRadius: '8px',
-                      color: isDark ? '#FCA5A5' : '#B91C1C',
-                      fontSize: '0.8rem',
-                      fontWeight: 600
-                    }}>
-                      <strong>Catatan Pengurus:</strong> {item.rejectionNote}
-                    </div>
-                  )}
-
-                  {/* Row 2: Lapor Kepada & Waktu */}
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                    gap: '8px',
-                    fontSize: '0.85rem',
-                    color: isDark ? '#FED7AA' : '#4B5563'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <User size={14} color={isDark ? '#FB923C' : '#F97316'} />
-                      <span>
-                        Lapor ke: <strong style={{ color: isDark ? '#FFFFFF' : '#111827' }}>@{item.laporToUsername}</strong>
-                        {item.laporToJabatan && ` (${item.laporToJabatan})`}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Calendar size={14} color={isDark ? '#FB923C' : '#F97316'} />
-                      <span>{formatPiketDate(item.timestamp)}</span>
-                    </div>
-                  </div>
-
-                  {/* Row 3: Bukti Foto / Video Thumbnails */}
-                  {item.buktiLink && item.buktiLink.length > 0 && (
-                    <div style={{
-                      paddingTop: '8px',
-                      borderTop: `1px dashed ${isDark ? '#3D291C' : '#E5E7EB'}`,
+                      padding: '6px',
+                      borderRadius: '10px',
+                      backgroundColor: isDark ? '#1C3D27' : '#DCFCE7',
+                      color: '#16A34A',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px',
-                      flexWrap: 'wrap'
+                      justifyContent: 'center'
                     }}>
-                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: isDark ? '#FED7AA' : '#6B7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <FileImage size={13} /> Bukti:
-                      </span>
-                      {item.buktiLink.map((url, imgIdx) => {
-                        const isVideo = url.includes('.mp4') || url.includes('.webm') || url.includes('.mov') || url.includes('video');
-                        return (
-                          <div
-                            key={imgIdx}
-                            onClick={() => setPreviewMedia({ url, type: isVideo ? 'video' : 'image' })}
-                            style={{
-                              position: 'relative',
-                              width: '40px',
-                              height: '40px',
-                              borderRadius: '8px',
-                              overflow: 'hidden',
-                              cursor: 'pointer',
-                              border: `1.5px solid ${isDark ? '#4A2E1E' : '#D1D5DB'}`,
-                              backgroundColor: '#000000'
-                            }}
-                            title="Klik untuk melihat bukti"
-                          >
-                            {isVideo ? (
-                              <video src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <img src={url} alt="bukti" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            )}
-                          </div>
-                        );
-                      })}
+                      <Users size={20} />
                     </div>
+                    <h3 style={{
+                      margin: 0,
+                      fontSize: '1.15rem',
+                      fontWeight: 900,
+                      color: isDark ? '#FFFFFF' : '#1C1C1E'
+                    }}>
+                      Siapa Saja yang Sudah Piket Hari Ini
+                    </h3>
+                  </div>
+
+                  <div style={{
+                    marginTop: '6px',
+                    fontSize: '0.85rem',
+                    color: isDark ? '#FED7AA' : '#6B7280',
+                    fontWeight: 600
+                  }}>
+                    <span>Daftar seluruh penghuni yang telah mengisi laporan piket hari ini.</span>
+                    {lastRefreshed && (
+                      <span style={{ opacity: 0.8, fontSize: '0.8rem', display: 'block', marginTop: '2px' }}>
+                        • Update: {lastRefreshed.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Total Counter & Refresh Button */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    padding: '6px 12px',
+                    backgroundColor: isDark ? '#1C3D27' : '#DCFCE7',
+                    border: `1px solid ${isDark ? '#16A34A' : '#86EFAC'}`,
+                    borderRadius: '20px',
+                    color: isDark ? '#86EFAC' : '#15803D',
+                    fontWeight: 850,
+                    fontSize: '0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <CheckCircle2 size={14} />
+                    <span>{todayPikets.length} Hari Ini</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={fetchAllPiketLists}
+                    disabled={loadingPending}
+                    title="Segarkan daftar"
+                    style={{
+                      padding: '8px 14px',
+                      backgroundColor: isDark ? '#3D291C' : '#F3F4F6',
+                      color: isDark ? '#FED7AA' : '#4B5563',
+                      border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+                      borderRadius: '12px',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      cursor: loadingPending ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease',
+                      opacity: loadingPending ? 0.7 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loadingPending) e.currentTarget.style.backgroundColor = isDark ? '#4A2E1E' : '#E5E7EB';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!loadingPending) e.currentTarget.style.backgroundColor = isDark ? '#3D291C' : '#F3F4F6';
+                    }}
+                  >
+                    <RotateCw size={15} style={{ animation: loadingPending ? 'spin 0.8s linear infinite' : 'none' }} />
+                    <span>{loadingPending ? 'Memuat...' : 'Refresh'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Search & Status Filter */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
+                  border: `1.5px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+                  borderRadius: '14px',
+                  padding: '8px 14px'
+                }}>
+                  <Search size={16} color={isDark ? '#FED7AA' : '#9CA3AF'} />
+                  <input
+                    type="text"
+                    value={filterTodayQuery}
+                    onChange={(e) => setFilterTodayQuery(e.target.value)}
+                    placeholder="Cari nama penghuni, angkatan, tempat piket..."
+                    style={{
+                      flex: 1,
+                      background: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      fontSize: '0.88rem',
+                      color: isDark ? '#FFFFFF' : '#1F2937',
+                      fontWeight: 700,
+                      fontFamily: '"Nunito", "Inter", sans-serif'
+                    }}
+                  />
+                  {filterTodayQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterTodayQuery('')}
+                      style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: 0 }}
+                    >
+                      <X size={14} />
+                    </button>
                   )}
                 </div>
-              ))}
+
+                {/* Status Filter Pills (Semua, Disetujui, Menunggu TTD) */}
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {[
+                    { key: 'ALL', label: `Semua (${todayPikets.length})` },
+                    { key: 'verified', label: `Disetujui (${todayPikets.filter(p => p.verification).length})` },
+                    { key: 'pending', label: `Menunggu TTD (${todayPikets.filter(p => !p.verification && p.status !== 'rejected').length})` }
+                  ].map(tab => {
+                    const isActive = filterTodayStatus === tab.key;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setFilterTodayStatus(tab.key)}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '10px',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          border: isActive ? '1.5px solid #F97316' : `1.5px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+                          backgroundColor: isActive ? (isDark ? '#3D291C' : '#FFF7ED') : (isDark ? '#1E130C' : '#FFFFFF'),
+                          color: isActive ? '#F97316' : (isDark ? '#FED7AA' : '#6B7280'),
+                          transition: 'all 0.1s'
+                        }}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Body Content: Today's Piket List */}
+              {loadingPending ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '32px 16px',
+                  color: isDark ? '#FED7AA' : '#6B7280'
+                }}>
+                  <RotateCw size={24} style={{ animation: 'spin 0.8s linear infinite', margin: '0 auto 12px auto', display: 'block', color: '#F97316' }} />
+                  <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Memuat daftar piket hari ini...</p>
+                </div>
+              ) : filteredTodayPikets.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '36px 16px',
+                  backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
+                  borderRadius: '16px',
+                  border: `1.5px dashed ${isDark ? '#4A2E1E' : '#E5E7EB'}`
+                }}>
+                  <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '8px' }}>🧹</span>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937' }}>
+                    {filterTodayQuery ? 'Penghuni Tidak Ditemukan' : 'Belum Ada yang Piket Hari Ini'}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: isDark ? '#FED7AA' : '#6B7280', fontWeight: 600 }}>
+                    {filterTodayQuery
+                      ? 'Coba gunakan kata kunci pencarian yang lain.'
+                      : 'Belum ada laporan piket yang dikirim hari ini. Jadilah yang pertama mengisi laporan!'}
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {filteredTodayPikets.map((item, index) => (
+                    <div
+                      key={item.id || index}
+                      style={{
+                        padding: '16px',
+                        backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
+                        border: `1.5px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+                        borderLeft: item.verification 
+                          ? '6px solid #10B981' 
+                          : (item.status === 'rejected' ? '6px solid #EF4444' : '6px solid #F59E0B'),
+                        borderRadius: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {/* Row 1: Profile Penghuni & Status Badge */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '10px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                          <img
+                            src={item.userPiketFoto || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.userPiketName)}&background=F97316&color=fff&size=80&bold=true`}
+                            alt={item.userPiketName}
+                            style={{
+                              width: '38px',
+                              height: '38px',
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              border: '2px solid #F97316',
+                              flexShrink: 0
+                            }}
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ 
+                              fontSize: '0.98rem', 
+                              fontWeight: 900, 
+                              color: isDark ? '#FFFFFF' : '#1F2937',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              {item.userPiketName}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                              <span style={{
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                color: '#F97316',
+                                backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                                padding: '1px 6px',
+                                borderRadius: '6px',
+                                border: '1px solid #F97316'
+                              }}>
+                                Angkatan {item.userPiketAngkatan}
+                              </span>
+                              {item.userPiketJabatan && (
+                                <span style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: 700,
+                                  color: isDark ? '#FED7AA' : '#6B7280',
+                                  textTransform: 'capitalize'
+                                }}>
+                                  • {item.userPiketJabatan}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status badge */}
+                        {item.verification ? (
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            backgroundColor: isDark ? '#1C3D27' : '#DCFCE7',
+                            border: `1px solid ${isDark ? '#16A34A' : '#86EFAC'}`,
+                            color: isDark ? '#86EFAC' : '#15803D',
+                            fontSize: '0.75rem',
+                            fontWeight: 850,
+                            flexShrink: 0
+                          }}>
+                            <CheckCircle2 size={12} />
+                            <span>Disetujui</span>
+                          </div>
+                        ) : item.status === 'rejected' ? (
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            backgroundColor: isDark ? '#4C1A1A' : '#FEE2E2',
+                            border: `1px solid ${isDark ? '#DC2626' : '#FCA5A5'}`,
+                            color: isDark ? '#FCA5A5' : '#DC2626',
+                            fontSize: '0.75rem',
+                            fontWeight: 850,
+                            flexShrink: 0
+                          }}>
+                            <AlertCircle size={12} />
+                            <span>Tidak Disetujui</span>
+                          </div>
+                        ) : (
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            backgroundColor: isDark ? '#451A03' : '#FFFBEB',
+                            border: `1px solid ${isDark ? '#D97706' : '#FDE68A'}`,
+                            color: isDark ? '#FCD34D' : '#B45309',
+                            fontSize: '0.75rem',
+                            fontWeight: 850,
+                            flexShrink: 0
+                          }}>
+                            <Clock size={12} />
+                            <span>Menunggu TTD</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Row 2: Tempat & Lapor Ke & Jam */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                        gap: '8px',
+                        fontSize: '0.85rem',
+                        color: isDark ? '#FED7AA' : '#4B5563',
+                        padding: '8px 12px',
+                        backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+                        borderRadius: '12px',
+                        border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <MapPin size={15} color="#F97316" style={{ flexShrink: 0 }} />
+                          <span>Tempat: <strong style={{ color: isDark ? '#FFFFFF' : '#111827' }}>{item.place}</strong></span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <User size={15} color={isDark ? '#FB923C' : '#F97316'} style={{ flexShrink: 0 }} />
+                          <span>Lapor ke: <strong style={{ color: isDark ? '#FFFFFF' : '#111827' }}>@{item.laporToUsername}</strong></span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Clock size={15} color={isDark ? '#FB923C' : '#F97316'} style={{ flexShrink: 0 }} />
+                          <span>Waktu: <strong>{item.timestamp ? item.timestamp.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : '-'}</strong></span>
+                        </div>
+                      </div>
+
+                      {/* Row 3: Bukti Foto / Video Thumbnails */}
+                      {item.buktiLink && item.buktiLink.length > 0 && (
+                        <div style={{
+                          paddingTop: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          flexWrap: 'wrap'
+                        }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 750, color: isDark ? '#FED7AA' : '#6B7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <FileImage size={13} /> Bukti Piket:
+                          </span>
+                          {item.buktiLink.map((url, imgIdx) => {
+                            const isVideo = url.includes('.mp4') || url.includes('.webm') || url.includes('.mov') || url.includes('video');
+                            return (
+                              <div
+                                key={imgIdx}
+                                onClick={() => setPreviewMedia({ url, type: isVideo ? 'video' : 'image' })}
+                                style={{
+                                  position: 'relative',
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                  cursor: 'pointer',
+                                  border: `1.5px solid ${isDark ? '#4A2E1E' : '#D1D5DB'}`,
+                                  backgroundColor: '#000000',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                }}
+                                title="Klik untuk melihat bukti"
+                              >
+                                {isVideo ? (
+                                  <video src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  <img src={url} alt="bukti" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
+
+          {/* ================================================================= */}
+          {/* TAB 2: DAFTAR PIKET MILIK USER LOGIN (PIKET SAYA) */}
+          {/* ================================================================= */}
+          {listTab === 'MY_PENDING' && (
+            <div>
+              {/* Header Section */}
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '16px',
+                paddingBottom: '16px',
+                borderBottom: `1px solid ${isDark ? '#4A2E1E' : '#F3F4F6'}`
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      padding: '6px',
+                      borderRadius: '10px',
+                      backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                      color: '#F97316',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Clock size={20} />
+                    </div>
+                    <h3 style={{
+                      margin: 0,
+                      fontSize: '1.15rem',
+                      fontWeight: 900,
+                      color: isDark ? '#FFFFFF' : '#1C1C1E'
+                    }}>
+                      Laporan Piket Saya (Belum Disetujui)
+                    </h3>
+                  </div>
+
+                  <div style={{
+                    marginTop: '6px',
+                    fontSize: '0.85rem',
+                    color: isDark ? '#FED7AA' : '#6B7280',
+                    fontWeight: 600
+                  }}>
+                    <span>Daftar laporan piket Anda yang berstatus Menunggu TTD atau Tidak Disetujui.</span>
+                    {lastRefreshed && (
+                      <span style={{ opacity: 0.8, fontSize: '0.8rem', display: 'block', marginTop: '2px' }}>
+                        • Update: {lastRefreshed.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Total Counter & Refresh Button */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    padding: '6px 12px',
+                    backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                    border: `1px solid ${isDark ? '#F97316' : '#FDBA74'}`,
+                    borderRadius: '12px',
+                    fontSize: '0.82rem',
+                    fontWeight: 850,
+                    color: '#F97316'
+                  }}>
+                    {myPikets.filter(p => p.status !== 'rejected').length} Menunggu
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={fetchAllPiketLists}
+                    disabled={loadingPending}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '12px',
+                      border: `1.5px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+                      backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
+                      color: isDark ? '#FED7AA' : '#4B5563',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      cursor: loadingPending ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s'
+                    }}
+                    title="Muat ulang daftar piket"
+                  >
+                    <RotateCw size={14} style={{ animation: loadingPending ? 'spin 1s linear infinite' : 'none' }} />
+                    <span>Refresh</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Search Bar & Status Filter Pills */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
+                  border: `1.5px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+                  borderRadius: '14px',
+                  padding: '8px 14px'
+                }}>
+                  <Search size={16} color={isDark ? '#FED7AA' : '#9CA3AF'} />
+                  <input
+                    type="text"
+                    value={filterPendingQuery}
+                    onChange={(e) => setFilterPendingQuery(e.target.value)}
+                    placeholder="Cari tempat atau nama penerima laporan..."
+                    style={{
+                      flex: 1,
+                      background: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      fontSize: '0.88rem',
+                      color: isDark ? '#FFFFFF' : '#1F2937',
+                      fontWeight: 700,
+                      fontFamily: '"Nunito", "Inter", sans-serif'
+                    }}
+                  />
+                  {filterPendingQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterPendingQuery('')}
+                      style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: 0 }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Status Filter Pills for Piket Saya (Menunggu & Tidak Disetujui) */}
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {[
+                    { key: 'ALL', label: `Semua (${myPikets.length})` },
+                    { key: 'pending', label: `Menunggu TTD (${myPikets.filter(p => p.status !== 'rejected').length})` },
+                    { key: 'rejected', label: `Tidak Disetujui (${myPikets.filter(p => p.status === 'rejected').length})` }
+                  ].map(tab => {
+                    const isActive = filterPendingStatus === tab.key;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setFilterPendingStatus(tab.key)}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '10px',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          border: isActive ? '1.5px solid #F97316' : `1.5px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+                          backgroundColor: isActive ? (isDark ? '#3D291C' : '#FFF7ED') : (isDark ? '#1E130C' : '#FFFFFF'),
+                          color: isActive ? '#F97316' : (isDark ? '#FED7AA' : '#6B7280'),
+                          transition: 'all 0.1s'
+                        }}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Body Content: User's Piket List */}
+              {loadingPending ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '32px 16px',
+                  color: isDark ? '#FED7AA' : '#6B7280'
+                }}>
+                  <RotateCw size={24} style={{ animation: 'spin 0.8s linear infinite', margin: '0 auto 12px auto', display: 'block', color: '#F97316' }} />
+                  <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Memuat daftar piket Anda...</p>
+                </div>
+              ) : filteredMyPikets.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '36px 16px',
+                  backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
+                  borderRadius: '16px',
+                  border: `1.5px dashed ${isDark ? '#4A2E1E' : '#E5E7EB'}`
+                }}>
+                  <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '8px' }}>📋</span>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937' }}>
+                    {filterPendingQuery ? 'Laporan Tidak Ditemukan' : 'Tidak Ada Laporan Piket'}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: isDark ? '#FED7AA' : '#6B7280', fontWeight: 600 }}>
+                    {filterPendingQuery
+                      ? 'Coba gunakan kata kunci pencarian yang lain.'
+                      : filterPendingStatus === 'pending'
+                        ? 'Semua laporan piket Anda sudah diproses / disetujui.'
+                        : 'Belum ada data laporan piket yang dikirimkan.'}
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {filteredMyPikets.map((item, index) => (
+                    <div
+                      key={item.id || index}
+                      style={{
+                        padding: '16px',
+                        backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
+                        border: `1.5px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+                        borderLeft: item.verification 
+                          ? '6px solid #10B981' 
+                          : (item.status === 'rejected' ? '6px solid #EF4444' : '6px solid #F59E0B'),
+                        borderRadius: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {/* Row 1: Tempat & Status Badge */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '10px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                          <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '10px',
+                            backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                            color: '#F97316',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 900,
+                            flexShrink: 0
+                          }}>
+                            <MapPin size={18} />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ 
+                              fontSize: '1rem', 
+                              fontWeight: 900, 
+                              color: isDark ? '#FFFFFF' : '#1F2937',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              {item.place}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: isDark ? '#FED7AA' : '#6B7280', fontWeight: 600 }}>
+                              Dilaporkan: {formatPiketDate(item.timestamp)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status badge */}
+                        {item.verification ? (
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            backgroundColor: isDark ? '#1C3D27' : '#DCFCE7',
+                            border: `1px solid ${isDark ? '#16A34A' : '#86EFAC'}`,
+                            color: isDark ? '#86EFAC' : '#15803D',
+                            fontSize: '0.75rem',
+                            fontWeight: 850,
+                            flexShrink: 0
+                          }}>
+                            <CheckCircle2 size={12} />
+                            <span>Disetujui</span>
+                          </div>
+                        ) : item.status === 'rejected' ? (
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            backgroundColor: isDark ? '#4C1A1A' : '#FEE2E2',
+                            border: `1px solid ${isDark ? '#DC2626' : '#FCA5A5'}`,
+                            color: isDark ? '#FCA5A5' : '#DC2626',
+                            fontSize: '0.75rem',
+                            fontWeight: 850,
+                            flexShrink: 0
+                          }}>
+                            <AlertCircle size={12} />
+                            <span>Tidak Disetujui</span>
+                          </div>
+                        ) : (
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            backgroundColor: isDark ? '#451A03' : '#FFFBEB',
+                            border: `1px solid ${isDark ? '#D97706' : '#FDE68A'}`,
+                            color: isDark ? '#FCD34D' : '#B45309',
+                            fontSize: '0.75rem',
+                            fontWeight: 850,
+                            flexShrink: 0
+                          }}>
+                            <Clock size={12} />
+                            <span>Menunggu TTD</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Row 2: Info Penerima Laporan (Lapor Ke) */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                        gap: '8px',
+                        fontSize: '0.85rem',
+                        color: isDark ? '#FED7AA' : '#4B5563',
+                        padding: '8px 12px',
+                        backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+                        borderRadius: '12px',
+                        border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <User size={15} color="#F97316" style={{ flexShrink: 0 }} />
+                          <span>Lapor ke: <strong style={{ color: isDark ? '#FFFFFF' : '#111827' }}>@{item.laporToUsername}</strong> ({item.laporToName})</span>
+                        </div>
+
+                        {item.laporToJabatan && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.78rem', color: isDark ? '#FED7AA' : '#6B7280' }}>
+                              Jabatan: <strong>{item.laporToJabatan}</strong>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Catatan Penolakan (Jika Ada) */}
+                      {item.rejectionNote && (
+                        <div style={{
+                          padding: '8px 12px',
+                          backgroundColor: isDark ? '#3D1414' : '#FEF2F2',
+                          border: `1px solid ${isDark ? '#991B1B' : '#F87171'}`,
+                          borderRadius: '10px',
+                          fontSize: '0.82rem',
+                          color: isDark ? '#FCA5A5' : '#B91C1C'
+                        }}>
+                          <strong>Alasan Penolakan:</strong> {item.rejectionNote}
+                        </div>
+                      )}
+
+                      {/* Row 3: Bukti Foto / Video Thumbnails */}
+                      {item.buktiLink && item.buktiLink.length > 0 && (
+                        <div style={{
+                          paddingTop: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          flexWrap: 'wrap'
+                        }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 750, color: isDark ? '#FED7AA' : '#6B7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <FileImage size={13} /> Bukti Unggahan:
+                          </span>
+                          {item.buktiLink.map((url, imgIdx) => {
+                            const isVideo = url.includes('.mp4') || url.includes('.webm') || url.includes('.mov') || url.includes('video');
+                            return (
+                              <div
+                                key={imgIdx}
+                                onClick={() => setPreviewMedia({ url, type: isVideo ? 'video' : 'image' })}
+                                style={{
+                                  position: 'relative',
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                  cursor: 'pointer',
+                                  border: `1.5px solid ${isDark ? '#4A2E1E' : '#D1D5DB'}`,
+                                  backgroundColor: '#000000',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                }}
+                                title="Klik untuk melihat bukti"
+                              >
+                                {isVideo ? (
+                                  <video src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  <img src={url} alt="bukti" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
 
         {/* Modal Pratinjau Media */}

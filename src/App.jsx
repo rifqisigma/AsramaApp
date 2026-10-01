@@ -20,6 +20,8 @@ import AcceptingSpa from './pages/AcceptingSpa';
 import HistoryActivity from './pages/HistoryActivity';
 import FormAbsenMalam from './pages/FormAbsenMalam';
 import VerificationAbsenMalam from './pages/VerificationAbsenMalam';
+import MonitoringAbsenMalam from './pages/MonitoringAbsenMalam';
+import DetailPersonAbsenMalam from './pages/DetailPersonAbsenMalam';
 import CatatanPiket from './pages/CatatanPiket';
 import CreateBerita from './pages/CreateBerita';
 import MonitoringAll from './pages/MonitoringAll';
@@ -110,9 +112,12 @@ function App() {
             <Route path="/spa" element={user ? <Spa /> : <Navigate to="/login" />} />
             <Route path="/form-spa" element={user ? <FormSpa /> : <Navigate to="/login" />} />
             <Route path="/accepting-spa" element={user ? <AcceptingSpa /> : <Navigate to="/login" />} />
+            <Route path="/monitoring-spa" element={user ? <AcceptingSpa /> : <Navigate to="/login" />} />
             <Route path="/history" element={user ? <HistoryActivity /> : <Navigate to="/login" />} />
             <Route path="/form-absen-malam" element={user ? <FormAbsenMalam /> : <Navigate to="/login" />} />
             <Route path="/verification-absen-malam" element={user ? <VerificationAbsenMalam /> : <Navigate to="/login" />} />
+            <Route path="/monitoring-absen-malam" element={user ? <MonitoringAbsenMalam /> : <Navigate to="/login" />} />
+            <Route path="/detail-person-absen-malam" element={user ? <DetailPersonAbsenMalam /> : <Navigate to="/login" />} />
             <Route path="/catatan-piket" element={user ? <CatatanPiket /> : <Navigate to="/login" />} />
             <Route path="/create-berita" element={user ? <CreateBerita /> : <Navigate to="/login" />} />
             <Route path="/monitoring-all" element={user ? <MonitoringAll /> : <Navigate to="/login" />} />
