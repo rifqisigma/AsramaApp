@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "asrama-ipb-sukasari"
-  }
+  },
+  "targets": {
+    "asrama-ipb-sukasari": {
+      "hosting": {
+        "ais": [
+          "internal-web-ais"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

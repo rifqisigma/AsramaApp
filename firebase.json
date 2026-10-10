@@ -26,7 +26,11 @@
     "rules": "storage.rules"
   },
   "hosting": {
-    "public": "y",
+    "target": "ais",
+    "public": "dist",
+    "predeploy": [
+      "npm run build"
+    ],
     "ignore": [
       "firebase.json",
       "**/.*",
