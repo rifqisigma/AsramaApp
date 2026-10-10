@@ -171,7 +171,7 @@ const FormSpa = () => {
   };
 
   return (
-    <div style={{
+    <div className="page-shell-narrow" style={{
       minHeight: '100vh',
       background: isDark ? '#1E130C' : '#FFF9F5',
       fontFamily: '"Nunito", "Inter", sans-serif',

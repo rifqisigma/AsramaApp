@@ -50,7 +50,7 @@ const CardJamal = ({ jamalStats, userData, theme }) => {
           border: `1px solid ${laporBorder}`,
           transition: 'all 0.3s ease'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', padding: '0 8px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', rowGap: '10px', justifyContent: 'space-between', marginBottom: '16px', padding: '0 8px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <span style={{ fontSize: '1.35rem', fontWeight: 800, color: countColor }}>{jamalStats.laporTotal}</span>
               <span style={{ fontSize: '0.65rem', fontWeight: 800, color: labelColor, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Disubmit</span>
@@ -96,7 +96,7 @@ const CardJamal = ({ jamalStats, userData, theme }) => {
             border: `1px solid ${ttdBorder}`,
             transition: 'all 0.3s ease'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', padding: '0 8px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', rowGap: '10px', justifyContent: 'space-between', marginBottom: '16px', padding: '0 8px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <span style={{ fontSize: '1.35rem', fontWeight: 800, color: countColor }}>{jamalStats.ttdTotal}</span>
                 <span style={{ fontSize: '0.65rem', fontWeight: 800, color: labelColor, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Laporan</span>

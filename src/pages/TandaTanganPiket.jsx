@@ -191,7 +191,7 @@ const TandaTanganPiket = () => {
       padding: '24px 16px 80px 16px',
       transition: 'background-color 0.3s ease'
     }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <div className="page-shell" style={{ maxWidth: '600px', margin: '0 auto' }}>
         <Link to="/home" style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -238,7 +238,7 @@ const TandaTanganPiket = () => {
             <p style={{ margin: 0, color: isDark ? '#9CA3AF' : '#6B7280' }}>Tidak ada laporan piket yang perlu diverifikasi saat ini.</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="rs-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {reports.map((report) => (
               <div key={report.id} style={{
                 backgroundColor: isDark ? '#2D1D13' : 'white',
@@ -248,7 +248,7 @@ const TandaTanganPiket = () => {
                 border: `1px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
                 transition: 'all 0.3s ease'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '16px', borderBottom: `1px solid ${isDark ? '#4A2E1E' : '#F3F4F6'}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '16px', paddingBottom: '16px', borderBottom: `1px solid ${isDark ? '#4A2E1E' : '#F3F4F6'}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: isDark ? '#1C2E4A' : '#EFF6FF', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#3B82F6', fontWeight: 800, fontSize: '1.2rem' }}>
                       {report.pelaporName.charAt(0).toUpperCase()}

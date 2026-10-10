@@ -319,7 +319,7 @@ const PenghakimanPoint = () => {
       minHeight: '100vh',
       fontFamily: '"Nunito", "Inter", sans-serif',
     }}>
-    <div style={{
+    <div className="page-shell" style={{
       maxWidth: '480px',
       margin: '0 auto',
       padding: '2rem 1.5rem 100px 1.5rem',
@@ -721,6 +721,7 @@ const PenghakimanPoint = () => {
               borderRadius: '16px',
               padding: '12px 16px',
               display: 'flex',
+              flexWrap: 'wrap',
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>

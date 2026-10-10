@@ -137,7 +137,7 @@ const Spa = () => {
   const qrisUrl = spaConfig?.Qris || '';
 
   return (
-    <div style={{
+    <div className="page-shell" style={{
       background: isDark ? '#1E130C' : '#FFF9F5',
       minHeight: '100vh',
       padding: '2rem 1.5rem 120px 1.5rem',
@@ -336,7 +336,7 @@ const Spa = () => {
           <span style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Transfer Bank</span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="rs-grid" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {bankMethods.map((bank, index) => (
             <div 
               key={index}
@@ -409,7 +409,7 @@ const Spa = () => {
           <span style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>E-Wallet</span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="rs-grid" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {ewalletMethods.map((wallet, index) => (
             <div 
               key={index}
@@ -520,7 +520,7 @@ const Spa = () => {
           padding: '1rem',
           animation: 'fadeIn 0.2s ease'
         }}>
-          <div style={{
+          <div className="rs-modal" style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '32px',
             padding: '24px',

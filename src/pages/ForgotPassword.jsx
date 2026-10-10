@@ -81,7 +81,7 @@ const ForgotPassword = () => {
       fontFamily: '"Nunito", "Inter", sans-serif',
       padding: '24px'
     }}>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', maxWidth: '400px', margin: '0 auto', width: '100%', paddingTop: '16px' }}>
+      <div className="page-shell-narrow" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', maxWidth: '400px', margin: '0 auto', width: '100%', paddingTop: '16px' }}>
         
         <Link to="/me" style={{ 
           display: 'inline-flex', 

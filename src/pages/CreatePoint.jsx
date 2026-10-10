@@ -219,7 +219,7 @@ const CreatePoint = () => {
       fontFamily: '"Nunito", "Inter", sans-serif',
       transition: 'background-color 0.3s ease'
     }}>
-    <div style={{
+    <div className="page-shell-narrow" style={{
       maxWidth: '480px',
       margin: '0 auto',
       padding: '2rem 1.5rem 100px 1.5rem',
@@ -345,7 +345,7 @@ const CreatePoint = () => {
             <label style={{ fontSize: '0.95rem', fontWeight: 800, color: isDark ? '#E5E7EB' : '#374151' }}>
               Tipe Kategori
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px' }}>
               <button
                 type="button"
                 onClick={() => setType('pengurangan')}

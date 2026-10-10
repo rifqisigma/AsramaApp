@@ -283,7 +283,7 @@ const VerificationAbsenMalam = () => {
   }
 
   return (
-    <div style={{
+    <div className="page-shell" style={{
       background: isDark ? '#1E130C' : '#FFF9F5',
       minHeight: '100vh',
       padding: '2rem 1.5rem 80px 1.5rem',
@@ -412,7 +412,7 @@ const VerificationAbsenMalam = () => {
           </p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="rs-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {filteredAttendance.map((record) => {
             const userDetails = usersMap[record.submitterId] || {
               username: 'Warga Tidak Dikenal',
@@ -496,7 +496,7 @@ const VerificationAbsenMalam = () => {
                 )}
 
                 {/* Bar Tombol Aksi */}
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '4px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginTop: '4px' }}>
                   {/* Tombol Toggle Map */}
                   <button
                     onClick={() => toggleMap(record.id)}

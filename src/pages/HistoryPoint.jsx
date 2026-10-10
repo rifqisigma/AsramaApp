@@ -71,6 +71,7 @@ const HistoryPoint = () => {
 
   return (
     <div
+      className="page-shell"
       style={{
         background: isDark ? '#1E130C' : '#FFF9F5',
         minHeight: '100vh',
@@ -166,7 +167,7 @@ const HistoryPoint = () => {
           {searchQuery ? 'Tidak ada riwayat yang cocok.' : 'Belum ada riwayat poin.'}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div className="rs-grid" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {filtered.map(h => {
             const isNeg = (h.point || 0) < 0;
             const accentColor = isNeg ? '#EF4444' : '#10B981';

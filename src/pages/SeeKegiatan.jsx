@@ -119,7 +119,7 @@ const SeeKegiatan = () => {
 
   if (errorMsg || !kegiatan) {
     return (
-      <div style={{
+      <div className="page-shell" style={{
         background: '#FFF9F5',
         minHeight: '100vh',
         padding: '2rem 1.5rem',
@@ -208,7 +208,7 @@ const SeeKegiatan = () => {
   // 5. Author's users field `username`
   // 6. Timestamp
   return (
-    <div style={{
+    <div className="page-shell" style={{
       background: '#FFF9F5',
       minHeight: '100vh',
       padding: '2rem 1.5rem 100px 1.5rem',

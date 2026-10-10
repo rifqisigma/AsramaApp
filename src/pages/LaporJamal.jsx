@@ -167,7 +167,7 @@ const LaporJamal = () => {
       padding: '24px 16px 80px 16px',
       transition: 'background-color 0.3s ease'
     }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <div className="page-shell-narrow" style={{ maxWidth: '600px', margin: '0 auto' }}>
 
         <Link to="/home" style={{
           display: 'inline-flex',
@@ -374,6 +374,8 @@ const LaporJamal = () => {
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '8px',
                       transition: 'all 0.3s ease'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isDark ? '#A78BFA' : '#6D28D9', fontWeight: 700, fontSize: '0.95rem' }}>

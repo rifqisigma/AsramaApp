@@ -1,0 +1,182 @@
+/* ============================================================================
+   responsive.css — Global responsive layer untuk AsramaApp
+   ----------------------------------------------------------------------------
+   Aplikasi ini mobile-first dan mayoritas layout-nya memakai inline style,
+   sehingga file ini menyediakan "hook" class + media query yang bisa dipasang
+   pada container yang sudah ada. Class di sini sengaja memakai `!important`
+   supaya dapat menimpa nilai `maxWidth` / `display` yang ditulis inline.
+
+   Konvensi pemakaian:
+   - .page-shell        -> kolom konten default (dashboards, list pages)
+   - .page-shell-narrow -> kolom sempit (form, halaman auth)
+   - .content-wrap      -> pembatas lebar konten DI DALAM shell full-bleed
+   - .rs-grid           -> container daftar kartu: 1 kolom (mobile) -> 2 kolom
+   - .rs-grid-3         -> varian .rs-grid yang jadi 3 kolom di layar lebar
+   - .rs-row-wrap       -> baris flex yang boleh wrap di layar sempit
+   - .rs-modal          -> kartu modal / bottom-sheet yang adaptif
+   ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   1. Keamanan dasar: cegah overflow horizontal di layar kecil (>=320px)
+   --------------------------------------------------------------------------- */
+html,
+body {
+  max-width: 100%;
+}
+
+/* `clip` tidak membuat scroll container, jadi `position: sticky` tetap aman */
+body {
+  overflow-x: clip;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+img {
+  height: auto;
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}
+
+/* ---------------------------------------------------------------------------
+   2. Backdrop halaman yang mengikuti tema (agar sisi kiri/kanan kolom
+      konten tidak "nyala" di mode gelap)
+   --------------------------------------------------------------------------- */
+html[data-theme='light'] body {
+  background-color: #f8f9fa;
+}
+
+html[data-theme='dark'] body {
+  background-color: #1e130c;
+}
+
+/* ---------------------------------------------------------------------------
+   3. Page shell — kolom konten yang di-center dan dilebarkan di desktop
+   --------------------------------------------------------------------------- */
+
+/* Form & halaman auth: cukup lebar untuk nyaman dibaca di desktop,
+   tapi tetap tidak selebar halaman list */
+@media (min-width: 640px) {
+  .page-shell-narrow {
+    max-width: 600px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
+
+/* Dashboard & halaman list: melebar di tablet ke atas */
+@media (min-width: 768px) {
+  .page-shell {
+    max-width: 760px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
+
+@media (min-width: 1280px) {
+  .page-shell {
+    max-width: 900px !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   4. content-wrap — untuk shell full-bleed yang backgroundColor-nya harus
+      tetap selebar layar, tapi isinya dibatasi lebar maksimumnya
+   --------------------------------------------------------------------------- */
+.content-wrap {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 768px) {
+  .content-wrap {
+    max-width: 760px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .content-wrap {
+    max-width: 960px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   5. Grid kartu adaptif
+   --------------------------------------------------------------------------- */
+/* `display` perlu !important untuk menimpa inline flex, tapi `gap` dibiarkan
+   non-important supaya nilai gap inline tiap halaman tetap dipakai. */
+.rs-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 700px) {
+  .rs-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .rs-grid.rs-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Grid dua kolom yang tetap dua kolom di mobile (mis. pasangan tombol) */
+.rs-grid-2col {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+/* Baris flex yang harus wrap bila ruang sempit */
+.rs-row-wrap {
+  flex-wrap: wrap !important;
+}
+
+/* ---------------------------------------------------------------------------
+   6. Modal / bottom-sheet
+   --------------------------------------------------------------------------- */
+@media (min-width: 640px) {
+  .rs-modal {
+    max-width: 560px !important;
+  }
+}
+
+/* Bottom-sheet: di desktop jangan menempel penuh ke bawah */
+@media (min-width: 640px) {
+  .bottom-sheet {
+    max-width: 560px !important;
+    margin-bottom: 2rem;
+    border-radius: 20px !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   7. Touch target & spacing kecil
+   --------------------------------------------------------------------------- */
+.rs-wrap-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Sembunyikan scrollbar untuk area yang di-scroll horizontal */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
