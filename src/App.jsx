@@ -57,8 +57,8 @@ function App() {
               // Initialize FCM when user is authenticated
               await initFCM();
             } else {
-              // Jika sedang sign up, jangan sign out dulu agar proses setDoc di SignUp.jsx selesai
-              if (localStorage.getItem('is_signing_up') === 'true') {
+              // Jika sedang sign up / linking, jangan sign out dulu agar proses di Login/SignUp selesai
+              if (localStorage.getItem('is_signing_up') === 'true' || localStorage.getItem('is_linking') === 'true') {
                 setUser(null);
               } else {
                 await signOut(auth);

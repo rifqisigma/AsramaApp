@@ -358,7 +358,7 @@ const Home = () => {
       {userData && <CardPoint userData={userData} theme={theme} />}
 
       {/* Cards Section */}
-      <div className="rs-grid" style={{ marginTop: '24px' }}>
+      <div className="" style={{ marginTop: '24px', display: 'grid', gridColumn: 3, gri }}>
 
         {/* 3. COMPONENT: Card Piket */}
         <CardPiket piketStats={piketStats} userData={userData} theme={theme} />
