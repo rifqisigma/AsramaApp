@@ -6,6 +6,14 @@
   <link rel="icon" type="image/svg+xml" href="/logo.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ais App</title>
+  <script>
+    // Set tema lebih awal supaya backdrop halaman tidak berkedip saat load
+    try {
+      document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  </script>
 </head>
 
 <body>

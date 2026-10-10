@@ -466,7 +466,7 @@ const AcceptingSpa = () => {
   }
 
   return (
-    <div style={{
+    <div className="page-shell" style={{
       background: isDark ? '#1E130C' : '#FFF9F5',
       minHeight: '100vh',
       padding: '2rem 1.5rem 80px 1.5rem',
@@ -959,7 +959,7 @@ const AcceptingSpa = () => {
           </p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div className="rs-grid" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {filteredPayments.map((payment) => (
             <div
               key={payment.id}
@@ -1136,7 +1136,7 @@ const AcceptingSpa = () => {
           padding: '1rem',
           animation: 'fadeIn 0.2s ease'
         }}>
-          <div style={{
+          <div className="rs-modal" style={{
             backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
             borderRadius: '32px',
             padding: '24px',
@@ -1254,7 +1254,7 @@ const AcceptingSpa = () => {
             </div>
 
             {/* Info Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px' }}>
               
               {/* User details */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>

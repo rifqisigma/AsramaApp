@@ -93,7 +93,7 @@ const Me = () => {
       fontFamily: '"Nunito", "Inter", sans-serif',
       transition: 'background-color 0.3s ease'
     }}>
-    <div style={{
+    <div className="page-shell-narrow" style={{
       maxWidth: '480px',
       margin: '0 auto',
       padding: '2rem 1.5rem 120px 1.5rem',
@@ -207,7 +207,7 @@ const Me = () => {
           <div style={{ height: '2px', backgroundColor: isDark ? '#3D291C' : '#FFF7ED', borderRadius: '2px' }}></div>
 
           {/* Grid Informasi Detail */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '20px' }}>
 
             {/* NIM */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>

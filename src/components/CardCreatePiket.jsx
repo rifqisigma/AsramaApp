@@ -20,6 +20,8 @@ const CardCreatePiket = ({ userData, theme }) => {
       padding: '20px',
       border: `2px dashed ${cardBorder}`,
       display: 'flex',
+      flexWrap: 'wrap',
+      gap: '12px',
       justifyContent: 'space-between',
       alignItems: 'center',
       transition: 'all 0.3s ease'

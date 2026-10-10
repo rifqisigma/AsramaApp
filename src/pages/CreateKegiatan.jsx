@@ -159,7 +159,7 @@ const CreateKegiatan = () => {
   // Guard: Only users with a jabatan (kementerian role) can create kegiatan
   if (!userData?.jabatan) {
     return (
-      <div style={{
+      <div className="page-shell-narrow" style={{
         background: isDark ? '#1E130C' : '#FFF9F5',
         minHeight: '100vh',
         padding: '2rem 1.5rem',
@@ -244,7 +244,7 @@ const CreateKegiatan = () => {
   }
 
   return (
-    <div style={{
+    <div className="page-shell-narrow" style={{
       background: isDark ? '#1E130C' : '#FFF9F5',
       minHeight: '100vh',
       padding: '2rem 1.5rem 100px 1.5rem',
@@ -434,7 +434,7 @@ const CreateKegiatan = () => {
               Waktu Selesai
             </label>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginBottom: '12px' }}>
               <button
                 type="button"
                 onClick={() => setWaktuSelesaiOption('selesai')}

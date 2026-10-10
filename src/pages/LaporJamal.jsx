@@ -305,7 +305,7 @@ const LaporJamal = () => {
         }
       `}</style>
 
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <div className="page-shell-narrow" style={{ maxWidth: '600px', margin: '0 auto' }}>
 
         <Link to="/home" style={{
           display: 'inline-flex',
@@ -654,10 +654,10 @@ const LaporJamal = () => {
           {/* Header Section */}
           <div style={{
             display: 'flex',
-            flexWrap: 'wrap',
             justifyContent: 'space-between',
             alignItems: 'center',
-            gap: '12px',
+            flexWrap: 'wrap',
+            gap: '8px',
             marginBottom: '16px',
             paddingBottom: '16px',
             borderBottom: `1px solid ${isDark ? '#4A2E1E' : '#F3F4F6'}`

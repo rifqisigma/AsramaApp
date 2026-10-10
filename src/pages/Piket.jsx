@@ -18,7 +18,7 @@ const Piket = () => {
   };
 
   return (
-    <div className="app-container">
+    <div className="app-container page-shell">
       <header className="header">
         <button className="back-btn" onClick={handleLogout}>
           <ArrowLeft size={24} />
@@ -43,7 +43,7 @@ const Piket = () => {
 
       <div className="content-area">
         {activeTab === 'unfinished' && (
-          <div className="piket-list">
+          <div className="piket-list rs-grid">
             {piketItems.map((item) => (
               <div key={item.id} className="piket-item">
                 <div className="piket-item-title">{item.title}</div>

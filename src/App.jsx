@@ -33,6 +33,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { ThemeProvider } from './context/ThemeContext';
+import AiChatWidget from './components/AiChatWidget';
 import { NotificationProvider } from './context/NotificationContext';
 import { initFCM } from './context/fcmService';
 
@@ -128,6 +129,8 @@ function App() {
             <Route path="/detail-person-point" element={user ? <DetailPersonPoint /> : <Navigate to="/login" />} />
             <Route path="/" element={<Navigate to={user ? "/home" : "/login"} />} />
           </Routes>
+
+          {user && <AiChatWidget />}
         </Router>
       </NotificationProvider>
     </ThemeProvider>
