@@ -3,6 +3,7 @@ import { auth, db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
+import { removeFCMToken } from '../context/fcmService';
 import { 
   ArrowLeft, 
   Mail, 
@@ -79,6 +80,9 @@ const Me = () => {
 
   const handleLogout = async () => {
     try {
+      if (auth.currentUser) {
+        await removeFCMToken(auth.currentUser.uid);
+      }
       await signOut(auth);
       navigate('/login');
     } catch (error) {

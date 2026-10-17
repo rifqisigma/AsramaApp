@@ -32,6 +32,7 @@ const sendNotification = async (userId, title, body, data = {}) => {
       },
       data: {
         ...data,
+        targetUserId: String(userId),
         clickAction: data.link || "/",
       },
       webpush: {
@@ -43,6 +44,10 @@ const sendNotification = async (userId, title, body, data = {}) => {
           body: body,
           icon: "/logo.png",
           badge: "/logo.png",
+          data: {
+            ...data,
+            targetUserId: String(userId),
+          },
         },
       },
     };

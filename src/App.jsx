@@ -37,7 +37,7 @@ import { auth, db } from './firebase';
 import { ThemeProvider } from './context/ThemeContext';
 import AiChatWidget from './components/AiChatWidget';
 import { NotificationProvider } from './context/NotificationContext';
-import { initFCM } from './context/fcmService';
+import { initFCM, removeFCMToken } from './context/fcmService';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -53,6 +53,11 @@ function App() {
 
         if (loginTimestamp && (now - parseInt(loginTimestamp)) > fifteenDays) {
           // Sesi kadaluarsa
+          try {
+            await removeFCMToken(currentUser.uid);
+          } catch (e) {
+            console.error("Error removing FCM token on session expiry:", e);
+          }
           await signOut(auth);
           localStorage.removeItem('auth_timestamp');
           setUser(null);
@@ -70,6 +75,11 @@ function App() {
               if (localStorage.getItem('is_signing_up') === 'true') {
                 setUser(null);
               } else {
+                try {
+                  await removeFCMToken(currentUser.uid);
+                } catch (e) {
+                  console.error("Error removing FCM token:", e);
+                }
                 await signOut(auth);
                 setUser(null);
               }

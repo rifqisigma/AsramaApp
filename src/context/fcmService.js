@@ -1,7 +1,6 @@
-import { getMessaging, getToken, onMessage } from "firebase/messaging";
-import { db } from "../firebase";
-import { doc, setDoc } from "firebase/firestore";
-import { auth } from "../firebase";
+import { getMessaging, getToken, onMessage, deleteToken } from "firebase/messaging";
+import { db, auth } from "../firebase";
+import { doc, setDoc, updateDoc, deleteField } from "firebase/firestore";
 
 const messaging = getMessaging();
 
@@ -50,6 +49,26 @@ export const getFCMToken = async () => {
 
 export const saveFCMToken = async (userId, token) => {
   try {
+    // 1. Jika device ini sebelumnya pernah login sebagai user lain,
+    // hapus token ini dari user lama agar notifikasi user lama tidak nyasar ke device ini
+    const prevUserId = localStorage.getItem("fcm_user_id");
+    if (prevUserId && prevUserId !== userId) {
+      try {
+        const prevUserRef = doc(db, "users", prevUserId);
+        await updateDoc(prevUserRef, {
+          [`fcmTokens.${token}`]: deleteField(),
+          lastTokenDisassociated: new Date().toISOString(),
+        });
+        console.log("Successfully removed token from previous user:", prevUserId);
+      } catch (err) {
+        console.warn("Could not remove token from previous user doc:", err);
+      }
+    }
+
+    localStorage.setItem("fcm_user_id", userId);
+    localStorage.setItem("fcm_current_token", token);
+
+    // 2. Daftarkan token ke user saat ini
     const userTokenRef = doc(db, "users", userId);
     await setDoc(
       userTokenRef,
@@ -61,9 +80,49 @@ export const saveFCMToken = async (userId, token) => {
       },
       { merge: true }
     );
-    console.log("FCM token saved to Firestore");
+    console.log("FCM token saved to Firestore for user:", userId);
   } catch (error) {
     console.error("Error saving FCM token to Firestore:", error);
+  }
+};
+
+/**
+ * Hapus token FCM saat logout agar akun ini tidak lagi menerima notifikasi di device ini
+ */
+export const removeFCMToken = async (userId) => {
+  try {
+    const currentToken =
+      localStorage.getItem("fcm_current_token") ||
+      (await getToken(messaging, { vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY }).catch(() => null));
+    const activeUserId = userId || localStorage.getItem("fcm_user_id") || auth.currentUser?.uid;
+
+    // 1. Hapus token dari dokumen user di Firestore
+    if (currentToken && activeUserId) {
+      try {
+        const userTokenRef = doc(db, "users", activeUserId);
+        await updateDoc(userTokenRef, {
+          [`fcmTokens.${currentToken}`]: deleteField(),
+          lastTokenUpdate: new Date().toISOString(),
+        });
+        console.log("FCM token deleted from Firestore for user:", activeUserId);
+      } catch (e) {
+        console.warn("Could not delete token field from Firestore:", e);
+      }
+    }
+
+    // 2. Batalkan token pada FCM browser agar akun berikutnya mendapat token fresh terpisah
+    try {
+      await deleteToken(messaging);
+      console.log("FCM token unregistered from browser messaging");
+    } catch (e) {
+      console.warn("Could not delete browser messaging token:", e);
+    }
+
+    // 3. Bersihkan localStorage
+    localStorage.removeItem("fcm_current_token");
+    localStorage.removeItem("fcm_user_id");
+  } catch (error) {
+    console.error("Error removing FCM token on logout:", error);
   }
 };
 

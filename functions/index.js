@@ -32,6 +32,7 @@ const sendNotification = async (userId, title, body, data = {}) => {
       },
       data: {
         ...data,
+        targetUserId: String(userId),
         clickAction: data.link || "/",
       },
       webpush: {
@@ -43,6 +44,10 @@ const sendNotification = async (userId, title, body, data = {}) => {
           body: body,
           icon: "/logo.png",
           badge: "/logo.png",
+          data: {
+            ...data,
+            targetUserId: String(userId),
+          },
         },
       },
     };
@@ -382,6 +387,55 @@ exports.onAbsenMalamVerified = onDocumentUpdated("absenMalam/{absenMalamId}", as
     type: "absen_malam_verification",
     absenMalamId: event.params.absenMalamId,
   });
+});
+
+/**
+ * Trigger: When a user document's fcmTokens is updated,
+ * ensure any token in this user's document is deleted from all other user documents.
+ * This guarantees that a single device token is exclusively bound to the currently logged-in account.
+ */
+exports.onUserFCMTokensUpdated = onDocumentUpdated("users/{userId}", async (event) => {
+  const beforeData = event.data.before?.data() || {};
+  const afterData = event.data.after?.data() || {};
+  const currentUserId = event.params.userId;
+
+  const afterTokens = Object.keys(afterData.fcmTokens || {});
+  if (afterTokens.length === 0) return;
+
+  const beforeTokens = Object.keys(beforeData.fcmTokens || {});
+  // Find newly registered or updated tokens
+  const relevantTokens = afterTokens.filter(t => !beforeTokens.includes(t) || afterTokens.length === 1);
+  if (relevantTokens.length === 0) return;
+
+  try {
+    for (const token of relevantTokens) {
+      // Find all other users that have this token
+      const duplicatesSnap = await db
+        .collection("users")
+        .where(`fcmTokens.${token}`, "!=", null)
+        .get();
+
+      const batch = db.batch();
+      let disassociatedCount = 0;
+
+      duplicatesSnap.forEach((docSnap) => {
+        if (docSnap.id !== currentUserId) {
+          batch.update(docSnap.ref, {
+            [`fcmTokens.${token}`]: admin.firestore.FieldValue.delete(),
+            lastTokenDisassociated: new Date().toISOString(),
+          });
+          disassociatedCount++;
+        }
+      });
+
+      if (disassociatedCount > 0) {
+        await batch.commit();
+        console.log(`Disassociated token from ${disassociatedCount} other user(s) to protect account ${currentUserId}`);
+      }
+    }
+  } catch (error) {
+    console.error("Error disassociating duplicate FCM tokens:", error);
+  }
 });
 
 // ---- Asisten AI (DeepSeek) ----

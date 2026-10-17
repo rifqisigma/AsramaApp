@@ -1,13 +1,33 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { setupMessageListener } from "./fcmService";
+import { auth } from "../firebase";
 
 const NotificationContext = createContext();
 
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
 
+  // Bersihkan riwayat notifikasi di UI saat akun logout / berganti akun
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        setNotifications([]);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   useEffect(() => {
     setupMessageListener((payload) => {
+      const targetUserId = payload.data?.targetUserId || payload.data?.userId;
+      const currentUid = auth.currentUser?.uid;
+
+      // Filter ketat keamanan: jika notifikasi ini dikirim untuk user lain, abaikan!
+      if (targetUserId && currentUid && targetUserId !== currentUid) {
+        console.warn("Abaikan notifikasi: bukan ditujukan untuk user aktif saat ini:", targetUserId, "Aktif:", currentUid);
+        return;
+      }
+
       const notification = {
         id: Date.now(),
         title: payload.notification?.title || "Notifikasi Baru",

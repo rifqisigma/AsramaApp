@@ -117,18 +117,51 @@ const AiChatWidget = () => {
 
   return (
     <>
-      {/* Keyframes untuk animasi spinner (inline style tidak bisa mendefinisikan @keyframes) */}
-      <style>{`@keyframes ai-chat-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      {/* Responsive styles for floating chat button and panel */}
+      <style>{`
+        @keyframes ai-chat-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* Desktop default */
+        .ai-chat-floating-btn {
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          width: 60px;
+          height: 60px;
+        }
+
+        .ai-chat-panel {
+          position: fixed;
+          bottom: 96px;
+          right: clamp(16px, calc((100vw - 360px) / 2 - 16px), 24px);
+          width: min(360px, calc(100vw - 32px));
+          height: min(520px, calc(100vh - 130px));
+        }
+
+        /* Mobile View: dinaikkan ke atas agar tidak menimpa bottom navbar */
+        @media (max-width: 768px) {
+          .ai-chat-floating-btn {
+            bottom: calc(98px + env(safe-area-inset-bottom, 0px)) !important;
+            right: 18px !important;
+            width: 56px !important;
+            height: 56px !important;
+          }
+
+          .ai-chat-panel {
+            bottom: calc(166px + env(safe-area-inset-bottom, 0px)) !important;
+            right: 16px !important;
+            left: auto !important;
+            width: min(360px, calc(100vw - 32px)) !important;
+            height: min(480px, calc(100vh - 180px)) !important;
+          }
+        }
+      `}</style>
 
       {/* ========== Panel Chat ========== */}
       {isOpen && (
         <div
+          className="ai-chat-panel"
           style={{
-            position: 'fixed',
-            bottom: '96px',
-            right: 'clamp(16px, calc((100vw - 360px) / 2 - 16px), 24px)',
-            width: 'min(360px, calc(100vw - 32px))',
-            height: 'min(520px, calc(100vh - 130px))',
             display: 'flex',
             flexDirection: 'column',
             backgroundColor: colors.panelBg,
@@ -329,13 +362,9 @@ const AiChatWidget = () => {
       {/* ========== Floating Button ========== */}
       <button
         onClick={() => setIsOpen((prev) => !prev)}
+        className="ai-chat-floating-btn"
         aria-label={isOpen ? 'Tutup Asisten AIS' : 'Buka Asisten AIS'}
         style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          width: '60px',
-          height: '60px',
           borderRadius: '50%',
           border: '2px solid #EA580C',
           backgroundColor: '#F97316',
