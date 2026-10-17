@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, getDocs, doc, getDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, X, Scale, Sparkles, Tag, Layers, User, Target } from 'lucide-react';
+import { ArrowLeft, Search, X, Scale, Sparkles, Tag, Layers, User, Target, Clock } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { logToGoogleSheets, formatVerificationData } from '../context/sheetsService';
 
@@ -42,18 +42,13 @@ const PenghakimanPoint = () => {
         const userDocRef = doc(db, 'users', auth.currentUser.uid);
         const docSnap = await getDoc(userDocRef);
 
-        let role = '';
-        let hasPointAccess = false;
         if (docSnap.exists()) {
           const uData = docSnap.data();
-          role = (uData.jabatan || '').toLowerCase().trim();
+          const cleanJabatan = (uData.jabatan || '').toLowerCase().replace(/\s+/g, '').trim();
           setUserRole(uData.jabatan || '');
 
-          const allowedRoles = ['kepenghunian', 'proteksi', 'presiden', 'wakil presiden'];
-          hasPointAccess = uData.pointAcces === true ||
-            uData.pointAccess === true ||
-            uData.point_access === true ||
-            allowedRoles.includes(role);
+          const allowedRoles = ['kepenghunian', 'presiden', 'wakilpresiden', 'wapres'];
+          hasPointAccess = allowedRoles.includes(cleanJabatan);
         }
 
         if (hasPointAccess) {
@@ -308,7 +303,7 @@ const PenghakimanPoint = () => {
             Akses Ditolak
           </h1>
           <p style={{ color: isDark ? '#D1D5DB' : '#6B7280', fontSize: '0.95rem', fontWeight: 600, lineHeight: 1.5, margin: '0 0 32px 0' }}>
-            Halaman ini khusus untuk Staff **Kepenghunian**, **Proteksi**, **Presiden**, **Wakil Presiden**, atau akun dengan izin **pointAcces**. Jabatan Anda saat ini adalah: **{userRole || 'Umum'}**.
+            Halaman ini khusus untuk Staff dengan jabatan <strong>Kepenghunian</strong>, <strong>Presiden</strong>, atau <strong>Wakil Presiden</strong>. Jabatan Anda saat ini: <strong>{userRole || 'Umum'}</strong>.
           </p>
 
           <button
@@ -391,7 +386,7 @@ const PenghakimanPoint = () => {
           >
             <ArrowLeft size={20} strokeWidth={3} />
           </button>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={{
               fontSize: '1.75rem',
               fontWeight: 800,
@@ -404,6 +399,28 @@ const PenghakimanPoint = () => {
               Tindak pelanggaran & prestasi santri
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => navigate('/list-penghakiman-poin')}
+            style={{
+              backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+              border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+              borderRadius: '14px',
+              padding: '8px 12px',
+              cursor: 'pointer',
+              color: '#F97316',
+              boxShadow: `0 3px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              flexShrink: 0
+            }}
+          >
+            <Clock size={15} />
+            <span>Riwayat</span>
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

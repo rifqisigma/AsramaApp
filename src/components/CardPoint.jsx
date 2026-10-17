@@ -169,10 +169,8 @@ const CardPoint = ({ userData, theme }) => {
               <span>📊 Rekap Poin</span>
             </button>
           </div>
-          {/* Staff / Authorized only buttons */}
-          {(userData?.pointAcces === true || 
-            userData?.pointAccess === true || 
-            ['kepenghunian', 'proteksi', 'presiden', 'wakil presiden', 'wapres'].includes(userData?.jabatan?.toLowerCase()?.trim())) && (
+          {/* Staff / Authorized only buttons (kepenghunian, presiden, wakil presiden) */}
+          {(['kepenghunian', 'presiden', 'wakil presiden', 'wakilpresiden', 'wapres'].includes((userData?.jabatan || '').toLowerCase().replace(/\s+/g, '').trim())) && (
             <div style={{
               marginTop: '8px',
               borderTop: dashBorder,
@@ -230,6 +228,32 @@ const CardPoint = ({ userData, theme }) => {
                 onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0px)'; e.currentTarget.style.boxShadow = '0 4px 0 #DC2626'; }}
               >
                 <span>⚖️ Penghakiman</span>
+              </button>
+              <button
+                onClick={() => navigate('/list-penghakiman-poin')}
+                style={{
+                  gridColumn: 'span 2',
+                  padding: '12px',
+                  backgroundColor: '#8B5CF6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '16px',
+                  fontSize: '0.85rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 0 #7C3AED',
+                  transition: 'transform 0.1s, box-shadow 0.1s',
+                  outline: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+                onMouseDown={e => { e.currentTarget.style.transform = 'translateY(4px)'; e.currentTarget.style.boxShadow = '0 0px 0 #7C3AED'; }}
+                onMouseUp={e => { e.currentTarget.style.transform = 'translateY(0px)'; e.currentTarget.style.boxShadow = '0 4px 0 #7C3AED'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0px)'; e.currentTarget.style.boxShadow = '0 4px 0 #7C3AED'; }}
+              >
+                <span>📋 Kelola Riwayat Poin</span>
               </button>
             </div>
           )}

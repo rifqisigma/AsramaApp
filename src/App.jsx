@@ -28,6 +28,8 @@ import MonitoringAll from './pages/MonitoringAll';
 import PiketPersonDetail from './pages/PiketPersonDetail';
 import AllPersonPoint from './pages/AllPersonPoint';
 import DetailPersonPoint from './pages/DetailPersonPoint';
+import ListPenghakimanPoin from './pages/ListPenghakimanPoin';
+import DetailPenghakimanPoin from './pages/DetailPenghakimanPoin';
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -126,6 +128,10 @@ function App() {
             <Route path="/all-person-point" element={user ? <AllPersonPoint /> : <Navigate to="/login" />} />
             <Route path="/all-persont-point" element={user ? <AllPersonPoint /> : <Navigate to="/login" />} />
             <Route path="/detail-person-point" element={user ? <DetailPersonPoint /> : <Navigate to="/login" />} />
+            <Route path="/list-penghakiman-poin" element={user ? <ListPenghakimanPoin /> : <Navigate to="/login" />} />
+            <Route path="/list-penghakiman-point" element={user ? <ListPenghakimanPoin /> : <Navigate to="/login" />} />
+            <Route path="/detail-penghakiman-poin" element={user ? <DetailPenghakimanPoin /> : <Navigate to="/login" />} />
+            <Route path="/detail-penghakiman-point" element={user ? <DetailPenghakimanPoin /> : <Navigate to="/login" />} />
             <Route path="/" element={<Navigate to={user ? "/home" : "/login"} />} />
           </Routes>
         </Router>
