@@ -738,7 +738,7 @@ const DetailPenghakimanPoin = () => {
 
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: isDark ? '#FED7AA' : '#374151', marginBottom: '5px' }}>
-                Waktu Transaksi
+                Tanggal Pelanggaran
               </label>
               <input
                 type="datetime-local"
@@ -758,6 +758,42 @@ const DetailPenghakimanPoin = () => {
                 }}
               />
             </div>
+          </div>
+
+          {/* Metadata Info: Tanggal Pelanggaran & Tanggal Dibuat (timestampCreate) */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
+            padding: '10px 14px',
+            borderRadius: '14px',
+            border: `1px dashed ${isDark ? '#4A2E1E' : '#E5E7EB'}`,
+            fontSize: '0.75rem',
+            color: isDark ? '#9CA3AF' : '#6B7280',
+            fontWeight: 650
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Calendar size={13} color="#10B981" />
+              <span>
+                <strong>Tanggal Pelanggaran (timestamp):</strong> Tanggal saat tindakan/pelanggaran berlaku.
+              </span>
+            </div>
+            {originalHistory?.timestampCreate && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Clock size={13} color="#F97316" />
+                <span>
+                  <strong>Waktu Dibuat (timestampCreate):</strong>{' '}
+                  {new Date(originalHistory.timestampCreate).toLocaleString('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

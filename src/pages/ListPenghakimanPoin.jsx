@@ -116,6 +116,16 @@ const ListPenghakimanPoin = () => {
         }
       }
 
+      let createDateObj = null;
+      if (data.timestampCreate) {
+        if (data.timestampCreate.toDate && typeof data.timestampCreate.toDate === 'function') {
+          createDateObj = data.timestampCreate.toDate();
+        } else {
+          const parsed = new Date(data.timestampCreate);
+          if (!isNaN(parsed.getTime())) createDateObj = parsed;
+        }
+      }
+
       return {
         id: d.id,
         ...data,
@@ -127,6 +137,7 @@ const ListPenghakimanPoin = () => {
         point,
         type,
         parsedDate: dateObj,
+        parsedCreateDate: createDateObj,
         targetUserId,
         targetUser,
         targetUsername: targetUser?.username || targetUser?.name || 'Penghuni',
@@ -1068,9 +1079,17 @@ const ListPenghakimanPoin = () => {
                     paddingTop: '8px'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Clock size={12} />
-                    <span>{formatDate(item.parsedDate)}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Calendar size={12} color="#10B981" />
+                      <span>Pelanggaran: <strong style={{ color: isDark ? '#FFFFFF' : '#1F2937' }}>{formatDate(item.parsedDate)}</strong></span>
+                    </div>
+                    {item.parsedCreateDate && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.66rem', color: isDark ? '#9CA3AF' : '#9CA3AF' }}>
+                        <Clock size={11} />
+                        <span>Dibuat: {formatDate(item.parsedCreateDate)}</span>
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span>Oleh: <strong style={{ color: '#F97316' }}>{item.judgeName}</strong></span>
@@ -1365,6 +1384,30 @@ const ListPenghakimanPoin = () => {
                   {selectedDeleteHistory.desc}
                 </p>
               )}
+
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '8px',
+                fontSize: '0.72rem',
+                color: isDark ? '#FED7AA' : '#6B7280',
+                borderTop: `1px dashed ${isDark ? '#3D291C' : '#FFEDD5'}`,
+                paddingTop: '6px',
+                marginTop: '4px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Calendar size={12} color="#10B981" />
+                  <span>Pelanggaran: <strong>{formatDate(selectedDeleteHistory.parsedDate)}</strong></span>
+                </div>
+                {selectedDeleteHistory.parsedCreateDate && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Clock size={11} />
+                    <span>Dibuat: {formatDate(selectedDeleteHistory.parsedCreateDate)}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Score Reversal Impact Box */}

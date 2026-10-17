@@ -2,9 +2,14 @@ import { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, getDocs, doc, getDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, X, Scale, Sparkles, Tag, Layers, User, Target, Clock } from 'lucide-react';
+import { ArrowLeft, Search, X, Scale, Sparkles, Tag, Layers, User, Target, Clock, Calendar } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { logToGoogleSheets, formatVerificationData } from '../context/sheetsService';
+
+const getTodayDateTimeLocal = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
 
 const PenghakimanPoint = () => {
   const navigate = useNavigate();
@@ -15,6 +20,9 @@ const PenghakimanPoint = () => {
   const [submitting, setSubmitting] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [userRole, setUserRole] = useState('');
+
+  // Tanggal Pelanggaran (Input Manual) & Tanggal Dibuat (Otomatis)
+  const [violationDate, setViolationDate] = useState(getTodayDateTimeLocal);
 
   // Search User State
   const [userQuery, setUserQuery] = useState('');
@@ -42,6 +50,7 @@ const PenghakimanPoint = () => {
         const userDocRef = doc(db, 'users', auth.currentUser.uid);
         const docSnap = await getDoc(userDocRef);
 
+        let hasPointAccess = false;
         if (docSnap.exists()) {
           const uData = docSnap.data();
           const cleanJabatan = (uData.jabatan || '').toLowerCase().replace(/\s+/g, '').trim();
@@ -182,6 +191,16 @@ const PenghakimanPoint = () => {
     try {
       const batch = writeBatch(db);
 
+      // Hitung timestamp pelanggaran (manual) dan timestampCreate (otomatis saat sidang dibuat)
+      const nowIso = new Date().toISOString();
+      let violationIso = nowIso;
+      if (violationDate) {
+        const parsed = new Date(violationDate);
+        if (!isNaN(parsed.getTime())) {
+          violationIso = parsed.toISOString();
+        }
+      }
+
       for (const u of selectedUsers) {
         // Calculate new point score — clamp ketat antara 0 (min) dan 110 (max)
         const currentPoint = u.point ?? 0;
@@ -204,7 +223,8 @@ const PenghakimanPoint = () => {
             type: p.type || (p.point < 0 ? 'pengurangan' : 'penambahan'),
             target: p.target || 'Seluruh penghuni',
             pointref: doc(db, 'systemPoint', p.id),
-            timestamp: new Date().toISOString(),
+            timestamp: violationIso,           // Tanggal Pelanggaran (Manual dari Form)
+            timestampCreate: nowIso,           // Tanggal Dibuat (Otomatis saat Transaksi)
             userref: doc(db, 'users', u.id),
             whoJudge: doc(db, 'users', auth.currentUser ? auth.currentUser.uid : 'mock-uid')
           };
@@ -220,7 +240,8 @@ const PenghakimanPoint = () => {
           selectedUsers: selectedUsers,
           selectedPoints: selectedPoints,
           totalDelta: totalDelta,
-          timestamp: new Date().toISOString()
+          timestamp: violationIso,
+          timestampCreate: nowIso
         });
         logToGoogleSheets({
           type: 'poin',
@@ -805,7 +826,100 @@ const PenghakimanPoint = () => {
             )}
           </div>
 
-          {/* SECTION 3: REAL-TIME PREVIEW & MATHS */}
+          {/* SECTION 3: TANGGAL PELANGGARAN (MANUAL INPUT) */}
+          <div style={{
+            backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+            borderRadius: '24px',
+            padding: '20px 24px',
+            border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+            boxShadow: isDark ? '0 6px 0 #4A2E1E' : '0 6px 0 #FFEDD5',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            transition: 'all 0.3s ease'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Langkah 3</span>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 850, color: isDark ? '#FFFFFF' : '#1F2937' }}>Input Tanggal Pelanggaran</h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: isDark ? '#FED7AA' : '#6B7280', fontWeight: 600 }}>
+                  Waktu & tanggal terjadinya pelanggaran (dapat disesuaikan secara manual)
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViolationDate(getTodayDateTimeLocal())}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '10px',
+                  border: `1.5px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                  backgroundColor: isDark ? '#1E130C' : '#FFF7ED',
+                  color: '#F97316',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Clock size={12} /> Set Sekarang
+              </button>
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <input
+                type="datetime-local"
+                value={violationDate}
+                onChange={(e) => setViolationDate(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '14px 14px 14px 40px',
+                  borderRadius: '16px',
+                  border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                  fontSize: '0.95rem',
+                  outline: 'none',
+                  fontFamily: '"Nunito", "Inter", sans-serif',
+                  boxShadow: `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                  backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
+                  fontWeight: 700,
+                  color: isDark ? '#FFFFFF' : '#1F2937',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <Calendar
+                size={18}
+                color="#10B981"
+                style={{
+                  position: 'absolute',
+                  left: '14px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  pointerEvents: 'none'
+                }}
+              />
+            </div>
+
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: isDark ? '#1E130C' : '#F9FAFB',
+              padding: '8px 12px',
+              borderRadius: '10px',
+              fontSize: '0.74rem',
+              color: isDark ? '#9CA3AF' : '#6B7280',
+              fontWeight: 650
+            }}>
+              <span>ℹ️</span>
+              <span>
+                <strong>Info Sistem:</strong> Tanggal di atas akan disimpan sebagai <code>timestamp</code> (tanggal pelanggaran). Waktu saat Anda menekan tombol kirim akan disimpan otomatis sebagai <code>timestampCreate</code>.
+              </span>
+            </div>
+          </div>
+
+          {/* SECTION 4: REAL-TIME PREVIEW & MATHS */}
           {selectedUsers.length > 0 && selectedPoints.length > 0 && (
             <div style={{
               backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
