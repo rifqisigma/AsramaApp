@@ -290,6 +290,8 @@ const Home = () => {
         }
       `}</style>
 
+      <div className="content-wrap">
+
       {/* Mini Profile Header */}
       {userData && (
         <div style={{
@@ -380,7 +382,7 @@ const Home = () => {
       {userData && <CardPoint userData={userData} theme={theme} />}
 
       {/* Cards Section */}
-      <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="rs-grid" style={{ marginTop: '24px' }}>
 
         {/* 3. COMPONENT: Card Piket */}
         <CardPiket piketStats={piketStats} userData={userData} theme={theme} />
@@ -484,6 +486,8 @@ const Home = () => {
             </div>
           </div>
         </div>
+      </div>
+
       </div>
 
       {/* Bottom Navigation Navbar - Style Duolingo */}

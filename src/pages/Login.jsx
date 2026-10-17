@@ -49,7 +49,7 @@ const Login = () => {
       fontFamily: '"Nunito", "Inter", sans-serif',
       padding: '24px'
     }}>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: '400px', margin: '0 auto', width: '100%' }}>
+      <div className="page-shell-narrow" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: '400px', margin: '0 auto', width: '100%' }}>
         
         <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#1C1C1E', marginBottom: '8px' }}>
           Selamat datang kembali

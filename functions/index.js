@@ -384,3 +384,7 @@ exports.onAbsenMalamVerified = onDocumentUpdated("absenMalam/{absenMalamId}", as
   });
 });
 
+// ---- Asisten AI (DeepSeek) ----
+// webAiChat (publik, untuk /web) & appAiChat (login, untuk /app).
+Object.assign(exports, require("./ai"));
+

@@ -201,7 +201,7 @@ const TtdJamal = () => {
       padding: '24px 16px 80px 16px',
       transition: 'background-color 0.3s ease'
     }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <div className="page-shell" style={{ maxWidth: '600px', margin: '0 auto' }}>
         <Link to="/home" style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -248,7 +248,7 @@ const TtdJamal = () => {
             <p style={{ margin: 0, color: isDark ? '#9CA3AF' : '#6B7280', fontWeight: 600 }}>Tidak ada laporan jam malam yang perlu diverifikasi saat ini.</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="rs-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {reports.map((report) => (
               <div key={report.id} style={{
                 backgroundColor: isDark ? '#2D1D45' : 'white',
@@ -259,7 +259,7 @@ const TtdJamal = () => {
                 transition: 'all 0.3s ease'
               }}>
                 {/* Card Header: Badges & General Info */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '16px', borderBottom: `1px solid ${isDark ? '#4C3080' : '#F3F4F6'}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '16px', paddingBottom: '16px', borderBottom: `1px solid ${isDark ? '#4C3080' : '#F3F4F6'}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: isDark ? '#3D2060' : '#F5F3FF', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#8B5CF6', fontWeight: 800, fontSize: '1.2rem' }}>
                       <Users size={22} />

@@ -222,7 +222,7 @@ const SeePoints = () => {
       fontFamily: '"Nunito", "Inter", sans-serif',
       transition: 'background-color 0.3s ease'
     }}>
-    <div style={{
+    <div className="page-shell" style={{
       maxWidth: '480px',
       margin: '0 auto',
       padding: '2rem 1.5rem 120px 1.5rem',
@@ -373,7 +373,7 @@ const SeePoints = () => {
           Tidak ada ketentuan poin ditemukan.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div className="rs-grid" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {filteredPoints.map((point) => {
             const isNegative = point.point < 0;
             const catStyle = getCategoryColor(point.category);

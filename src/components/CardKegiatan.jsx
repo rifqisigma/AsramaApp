@@ -87,7 +87,7 @@ const CardKegiatan = ({
       transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease'
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: titleColor, transition: 'color 0.3s' }}>
             Agenda Kegiatan
@@ -114,7 +114,7 @@ const CardKegiatan = ({
 
       {/* Date Picker Section */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
           <span style={{ fontSize: '0.7rem', fontWeight: 800, color: labelColor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Pilih Tanggal
           </span>

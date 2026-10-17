@@ -436,7 +436,7 @@ const FormAbsenMalam = () => {
   });
 
   return (
-    <div style={{
+    <div className="page-shell-narrow" style={{
       background: isDark ? '#1E130C' : '#FFF9F5',
       minHeight: '100vh',
       padding: '2rem 1.5rem 80px 1.5rem',

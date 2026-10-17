@@ -243,7 +243,7 @@ const HistoryActivity = () => {
       fontFamily: '"Nunito", "Inter", sans-serif',
       transition: 'background-color 0.3s ease'
     }}>
-    <div style={{
+    <div className="page-shell" style={{
       maxWidth: '480px',
       margin: '0 auto',
       padding: '2rem 1.5rem 100px 1.5rem',
@@ -681,7 +681,7 @@ const HistoryActivity = () => {
           padding: '1rem',
           animation: 'fadeIn 0.2s ease'
         }}>
-          <div style={{
+          <div className="rs-modal" style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '28px',
             padding: '24px',

@@ -466,7 +466,7 @@ const LaporPiket = () => {
       padding: '24px 16px 80px 16px',
       transition: 'background-color 0.3s ease'
     }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <div className="page-shell-narrow" style={{ maxWidth: '600px', margin: '0 auto' }}>
 
         <Link to="/home" style={{
           display: 'inline-flex',
@@ -712,7 +712,9 @@ const LaporPiket = () => {
                 borderRadius: '8px',
                 display: 'flex',
                 justifyContent: 'space-between',
-                alignItems: 'center'
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '8px'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isDark ? '#10B981' : '#047857', fontWeight: 700, fontSize: '0.95rem' }}>
                   <CheckCircle size={18} />

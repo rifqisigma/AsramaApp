@@ -171,7 +171,7 @@ const CatatanPiket = () => {
       padding: '24px 16px 80px 16px',
       transition: 'background-color 0.3s ease'
     }}>
-      <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+      <div className="page-shell" style={{ maxWidth: '480px', margin: '0 auto' }}>
 
         {/* Back Button */}
         <button

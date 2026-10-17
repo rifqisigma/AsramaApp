@@ -323,7 +323,7 @@ const TandaTanganPiket = () => {
         }
       `}</style>
 
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <div className="page-shell" style={{ maxWidth: '600px', margin: '0 auto' }}>
         <Link to="/home" style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -477,7 +477,7 @@ const TandaTanganPiket = () => {
             </p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="rs-grid" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {filteredReports.map((report) => (
               <div key={report.id} style={{
                 backgroundColor: isDark ? '#2D1D13' : 'white',

@@ -113,7 +113,7 @@ const CreatePiket = () => {
       paddingBottom: '80px',
       transition: 'background-color 0.3s ease'
     }}>
-      <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+      <div className="page-shell-narrow" style={{ maxWidth: '480px', margin: '0 auto' }}>
 
         <Link to="/home" style={{
           display: 'inline-flex',
