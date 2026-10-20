@@ -1,10 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { auth, db } from '../firebase';
 import { collection, addDoc, doc, GeoPoint, getDocs } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
+import AbsenMalamGamificationSection from '../components/AbsenMalamGamificationSection';
+import { useAbsenMalamMonthlyLeaderboard } from '../hooks/useAbsenMalamMonthlyLeaderboard';
+import { buildNightRecap, getNightKey } from '../utils/absenMalamGamification';
 import {
   ArrowLeft,
   MapPin,
@@ -424,6 +427,27 @@ const FormAbsenMalam = () => {
     month: 'long',
     year: 'numeric'
   });
+
+  // ── Gamifikasi: juara malam ini + klasemen bulan berjalan ──
+  const tonightKey = getNightKey(new Date());
+  const currentMonthKey = tonightKey.slice(0, 7);
+  const {
+    loading: loadingLeaderboard,
+    leaderboard,
+    getUser: getGamificationUser,
+  } = useAbsenMalamMonthlyLeaderboard(currentMonthKey);
+
+  // Rekap malam ini diturunkan dari daftar absen hari ini (sudah dimuat halaman).
+  const tonightRecap = useMemo(() => {
+    const recs = todayAttendance.map((item) => ({
+      id: item.id,
+      uid: item.userId,
+      at: item.createdDate,
+      nightKey: getNightKey(item.createdDate),
+    }));
+    const recap = buildNightRecap(recs);
+    return recap.get(getNightKey(new Date())) || null;
+  }, [todayAttendance]);
 
   const filteredTodayAttendance = todayAttendance.filter((item) => {
     if (!searchTodayQuery.trim()) return true;
@@ -1078,6 +1102,25 @@ const FormAbsenMalam = () => {
             )}
           </button>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SECTION: GAMIFIKASI ABSEN MALAM (JUARA MALAM INI) */}
+      {/* ========================================================================= */}
+      {!checkingDaily && (
+        <AbsenMalamGamificationSection
+          nightRecap={tonightRecap}
+          leaderboard={leaderboard}
+          getUser={(uid) => {
+            const fromPage = todayAttendance.find((a) => a.userId === uid)?.userData;
+            if (fromPage) return fromPage;
+            return getGamificationUser(uid);
+          }}
+          nightKey={tonightKey}
+          monthKey={currentMonthKey}
+          loading={loadingTodayList || loadingLeaderboard}
+          theme={theme}
+        />
       )}
 
       {/* ========================================================================= */}

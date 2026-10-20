@@ -23,7 +23,10 @@ import VerificationAbsenMalam from './pages/VerificationAbsenMalam';
 import MonitoringAbsenMalam from './pages/MonitoringAbsenMalam';
 import DetailPersonAbsenMalam from './pages/DetailPersonAbsenMalam';
 import CatatanPiket from './pages/CatatanPiket';
-import CreateBerita from './pages/CreateBerita';
+import Berita from './pages/Berita';
+import BeritaForm from './pages/BeritaForm';
+import DetailBerita from './pages/DetailBerita';
+import AbsenMalamLeaderboard from './pages/AbsenMalamLeaderboard';
 import MonitoringAll from './pages/MonitoringAll';
 import PiketPersonDetail from './pages/PiketPersonDetail';
 import AllPersonPoint from './pages/AllPersonPoint';
@@ -132,7 +135,11 @@ function App() {
             <Route path="/monitoring-absen-malam" element={user ? <MonitoringAbsenMalam /> : <Navigate to="/login" />} />
             <Route path="/detail-person-absen-malam" element={user ? <DetailPersonAbsenMalam /> : <Navigate to="/login" />} />
             <Route path="/catatan-piket" element={user ? <CatatanPiket /> : <Navigate to="/login" />} />
-            <Route path="/create-berita" element={user ? <CreateBerita /> : <Navigate to="/login" />} />
+            <Route path="/berita" element={user ? <Berita /> : <Navigate to="/login" />} />
+            <Route path="/create-berita" element={user ? <BeritaForm /> : <Navigate to="/login" />} />
+            <Route path="/edit-berita" element={user ? <BeritaForm /> : <Navigate to="/login" />} />
+            <Route path="/detail-berita" element={user ? <DetailBerita /> : <Navigate to="/login" />} />
+            <Route path="/absen-malam-leaderboard" element={user ? <AbsenMalamLeaderboard /> : <Navigate to="/login" />} />
             <Route path="/monitoring-all" element={user ? <MonitoringAll /> : <Navigate to="/login" />} />
             <Route path="/piket-person-detail" element={user ? <PiketPersonDetail /> : <Navigate to="/login" />} />
             <Route path="/piket-personal-detail" element={user ? <PiketPersonDetail /> : <Navigate to="/login" />} />

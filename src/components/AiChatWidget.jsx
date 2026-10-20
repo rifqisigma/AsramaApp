@@ -4,6 +4,25 @@ import { MessageCircle, X, Send, Loader2, Sparkles } from 'lucide-react';
 import { functions } from '../firebase';
 import { useTheme } from '../context/ThemeContext';
 
+// Breakpoint: di bawah 640px widget tampil sebagai tab yang menempel di sisi layar
+const MOBILE_BREAKPOINT = 640;
+
+// Pantau lebar viewport agar gaya tombol/panel bisa berubah sesuai breakpoint
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= MOBILE_BREAKPOINT : false
+  );
+
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
+    const onChange = (e) => setIsMobile(e.matches);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  return isMobile;
+};
+
 // Sapaan awal saat panel pertama kali dibuka
 const GREETING = 'Hai! Aku Asisten AIS. Aku bisa bantu soal poin kamu, aturan/AD-ART, piket, jam malam, SPA, dan info internal lainnya.';
 
@@ -28,6 +47,7 @@ const friendlyError = (err) => {
 const AiChatWidget = () => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const isMobile = useIsMobile();
 
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -165,8 +185,9 @@ const AiChatWidget = () => {
             display: 'flex',
             flexDirection: 'column',
             backgroundColor: colors.panelBg,
-            border: `2px solid ${colors.panelBorder}`,
-            borderRadius: '24px',
+            border: isMobile ? 'none' : `2px solid ${colors.panelBorder}`,
+            borderTop: `2px solid ${colors.panelBorder}`,
+            borderRadius: isMobile ? '20px 20px 0 0' : '24px',
             boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25)',
             overflow: 'hidden',
             zIndex: 9998,
@@ -359,7 +380,9 @@ const AiChatWidget = () => {
         </div>
       )}
 
-      {/* ========== Floating Button ========== */}
+      {/* ========== Tombol Pemicu ==========
+          Desktop : tombol bulat melayang di kanan bawah
+          Mobile  : tab yang menempel di sisi kanan layar (sidebar) */}
       <button
         onClick={() => setIsOpen((prev) => !prev)}
         className="ai-chat-floating-btn"
@@ -367,13 +390,18 @@ const AiChatWidget = () => {
         style={{
           borderRadius: '50%',
           border: '2px solid #EA580C',
+          borderRight: isMobile ? 'none' : '2px solid #EA580C',
           backgroundColor: '#F97316',
           color: '#FFFFFF',
           cursor: 'pointer',
           display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 6px 16px rgba(249, 115, 22, 0.45)',
+          gap: isMobile ? '2px' : 0,
+          boxShadow: isMobile
+            ? '-4px 4px 14px rgba(249, 115, 22, 0.4)'
+            : '0 6px 16px rgba(249, 115, 22, 0.45)',
           zIndex: 9999,
           transition: 'transform 0.15s ease',
         }}
@@ -387,7 +415,19 @@ const AiChatWidget = () => {
           e.currentTarget.style.transform = 'translateY(0px)';
         }}
       >
-        {isOpen ? <X size={26} /> : <MessageCircle size={26} />}
+        {isOpen ? <X size={isMobile ? 22 : 26} /> : <MessageCircle size={isMobile ? 22 : 26} />}
+        {!isOpen && isMobile && (
+          <span
+            style={{
+              fontSize: '0.55rem',
+              fontWeight: 800,
+              letterSpacing: '0.02em',
+              lineHeight: 1,
+            }}
+          >
+            AI
+          </span>
+        )}
       </button>
     </>
   );
