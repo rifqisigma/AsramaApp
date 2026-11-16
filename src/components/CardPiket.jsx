@@ -130,6 +130,38 @@ const CardPiket = ({ piketStats, userData, theme }) => {
           </div>
         )}
 
+        {/* Peringkat & Klasemen Piket */}
+        <button
+          onClick={() => window.location.href = '/piket-leaderboard'}
+          style={{
+            width: '100%',
+            padding: '12px',
+            backgroundColor: isDark ? '#422006' : '#FEF3C7',
+            color: isDark ? '#FCD34D' : '#B45309',
+            border: `2px solid ${isDark ? '#B45309' : '#FBBF24'}`,
+            borderRadius: '16px',
+            fontSize: '0.95rem',
+            fontWeight: 800,
+            cursor: 'pointer',
+            boxShadow: isDark ? '0 4px 0 #78350F' : '0 4px 0 #F59E0B',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            transition: 'all 0.1s ease'
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = 'translateY(2px)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = isDark ? '0 4px 0 #78350F' : '0 4px 0 #F59E0B';
+          }}
+        >
+          <span>🏆 Peringkat & Juara Piket</span>
+        </button>
+
         {/* Monitoring Piket Section (Hanya untuk yang bukan CALON) */}
         {userData?.statusPenghuni !== 'CALON' && (
           <div style={{

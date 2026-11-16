@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
@@ -14,6 +14,12 @@ import CardJamal from '../../components/CardJamal';
 import CardCreatePiket from '../../components/CardCreatePiket';
 import CardAbsenMalam from '../../components/CardAbsenMalam';
 import CardBerita from '../../components/CardBerita';
+import AbsenMalamGamificationSection from '../../components/AbsenMalamGamificationSection';
+import PiketGamificationSection from '../../components/PiketGamificationSection';
+import { useAbsenMalamGamification } from '../../hooks/useAbsenMalamGamification';
+import { usePiketGamification } from '../../hooks/usePiketGamification';
+import { getTodayNightKey } from '../../utils/absenMalamGamification';
+import { getTodayDayKey } from '../../utils/piketGamification';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -47,6 +53,69 @@ const Home = () => {
     today.setHours(0, 0, 0, 0);
     return today;
   });
+
+  // Gamifikasi Absen Malam (Section Perangkingan / Juara Absen Malam)
+  const {
+    rawRecords,
+    loading: loadingGamification,
+    tonightKey,
+    latestNightKey,
+    getRecapForMonth,
+    getLeaderboardForMonth,
+    getUser: getGamificationUser,
+  } = useAbsenMalamGamification();
+
+  const defaultNight = useMemo(() => {
+    const available = new Set(rawRecords.map((r) => r.nightKey));
+    return available.has(tonightKey) ? tonightKey : latestNightKey;
+  }, [rawRecords, tonightKey, latestNightKey]);
+
+  const activeNight = defaultNight || tonightKey;
+  const activeMonth = activeNight ? activeNight.slice(0, 7) : getTodayNightKey().slice(0, 7);
+
+  const monthRecap = useMemo(
+    () => (activeMonth ? getRecapForMonth(activeMonth) : new Map()),
+    [activeMonth, getRecapForMonth]
+  );
+
+  const nightRecap = monthRecap.get(activeNight) || null;
+  const leaderboard = useMemo(
+    () => (activeMonth ? getLeaderboardForMonth(activeMonth) : []),
+    [activeMonth, getLeaderboardForMonth]
+  );
+
+  // Tab Gamifikasi: 'absen' | 'piket'
+  const [gamificationTab, setGamificationTab] = useState('absen');
+
+  // Gamifikasi Manajemen Piket
+  const {
+    rawRecords: piketRecords,
+    loading: loadingPiketGamification,
+    todayKey: piketTodayKey,
+    latestDayKey: piketLatestDayKey,
+    getRecapForMonth: getPiketRecapForMonth,
+    getLeaderboardForMonth: getPiketLeaderboardForMonth,
+    getUser: getPiketUser,
+  } = usePiketGamification();
+
+  const defaultPiketDay = useMemo(() => {
+    const available = new Set(piketRecords.map((r) => r.dayKey));
+    return available.has(piketTodayKey) ? piketTodayKey : piketLatestDayKey;
+  }, [piketRecords, piketTodayKey, piketLatestDayKey]);
+
+  const activePiketDay = defaultPiketDay || piketTodayKey;
+  const activePiketMonth = activePiketDay ? activePiketDay.slice(0, 7) : getTodayDayKey().slice(0, 7);
+
+  const monthPiketRecap = useMemo(
+    () => (activePiketMonth ? getPiketRecapForMonth(activePiketMonth) : new Map()),
+    [activePiketMonth, getPiketRecapForMonth]
+  );
+
+  const piketDayRecap = monthPiketRecap.get(activePiketDay) || null;
+  const piketLeaderboard = useMemo(
+    () => (activePiketMonth ? getPiketLeaderboardForMonth(activePiketMonth) : []),
+    [activePiketMonth, getPiketLeaderboardForMonth]
+  );
 
   // Fetch Piket Stats
   useEffect(() => {
@@ -380,6 +449,91 @@ const Home = () => {
 
       {/* 2. COMPONENT: Card Poin Asrama */}
       {userData && <CardPoint userData={userData} theme={theme} />}
+
+      {/* 3. COMPONENT: Section Perangkingan (Absen Malam / Piket Asrama) */}
+      <div style={{ marginBottom: '24px' }}>
+        {/* Segmented Control Tabs */}
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          marginBottom: '12px',
+          backgroundColor: isDark ? '#2D1D13' : '#F3F4F6',
+          padding: '6px',
+          borderRadius: '18px',
+          border: `1.5px solid ${isDark ? '#4A2E1E' : '#E5E7EB'}`
+        }}>
+          <button
+            type="button"
+            onClick={() => setGamificationTab('absen')}
+            style={{
+              flex: 1,
+              padding: '9px 14px',
+              borderRadius: '14px',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 800,
+              fontSize: '0.84rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              backgroundColor: gamificationTab === 'absen' ? '#F97316' : 'transparent',
+              color: gamificationTab === 'absen' ? '#FFFFFF' : (isDark ? '#FED7AA' : '#6B7280'),
+              boxShadow: gamificationTab === 'absen' ? '0 3px 0 #EA580C' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <span>🌙 Juara Absen Malam</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setGamificationTab('piket')}
+            style={{
+              flex: 1,
+              padding: '9px 14px',
+              borderRadius: '14px',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 800,
+              fontSize: '0.84rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              backgroundColor: gamificationTab === 'piket' ? '#F97316' : 'transparent',
+              color: gamificationTab === 'piket' ? '#FFFFFF' : (isDark ? '#FED7AA' : '#6B7280'),
+              boxShadow: gamificationTab === 'piket' ? '0 3px 0 #EA580C' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <span>🧹 Juara Piket Asrama</span>
+          </button>
+        </div>
+
+        {gamificationTab === 'absen' ? (
+          <AbsenMalamGamificationSection
+            nightRecap={nightRecap}
+            leaderboard={leaderboard}
+            getUser={getGamificationUser}
+            nightKey={activeNight}
+            monthKey={activeMonth}
+            loading={loadingGamification}
+            theme={theme}
+            style={{ marginTop: 0 }}
+          />
+        ) : (
+          <PiketGamificationSection
+            dayRecap={piketDayRecap}
+            leaderboard={piketLeaderboard}
+            getUser={getPiketUser}
+            dayKey={activePiketDay}
+            monthKey={activePiketMonth}
+            loading={loadingPiketGamification}
+            theme={theme}
+            style={{ marginTop: 0 }}
+          />
+        )}
+      </div>
 
       {/* Cards Section */}
       <div className="rs-grid" style={{ marginTop: '24px' }}>

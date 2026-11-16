@@ -27,6 +27,7 @@ import Berita from './pages/Berita';
 import BeritaForm from './pages/BeritaForm';
 import DetailBerita from './pages/DetailBerita';
 import AbsenMalamLeaderboard from './pages/AbsenMalamLeaderboard';
+import PiketLeaderboard from './pages/PiketLeaderboard';
 import MonitoringAll from './pages/MonitoringAll';
 import PiketPersonDetail from './pages/PiketPersonDetail';
 import AllPersonPoint from './pages/AllPersonPoint';
@@ -140,6 +141,7 @@ function App() {
             <Route path="/edit-berita" element={user ? <BeritaForm /> : <Navigate to="/login" />} />
             <Route path="/detail-berita" element={user ? <DetailBerita /> : <Navigate to="/login" />} />
             <Route path="/absen-malam-leaderboard" element={user ? <AbsenMalamLeaderboard /> : <Navigate to="/login" />} />
+            <Route path="/piket-leaderboard" element={user ? <PiketLeaderboard /> : <Navigate to="/login" />} />
             <Route path="/monitoring-all" element={user ? <MonitoringAll /> : <Navigate to="/login" />} />
             <Route path="/piket-person-detail" element={user ? <PiketPersonDetail /> : <Navigate to="/login" />} />
             <Route path="/piket-personal-detail" element={user ? <PiketPersonDetail /> : <Navigate to="/login" />} />

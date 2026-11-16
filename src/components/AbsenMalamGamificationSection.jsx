@@ -46,6 +46,7 @@ const AbsenMalamGamificationSection = ({
   monthKey,
   loading,
   theme,
+  style = {},
 }) => {
   const navigate = useNavigate();
   const isDark = theme === 'dark';
@@ -67,9 +68,10 @@ const AbsenMalamGamificationSection = ({
     return (
       <div style={{
         marginTop: '28px', padding: '20px',
-        backgroundColor: cardBg, borderRadius: '28px',
+        backgroundColor: cardBg, borderRadius: '24px',
         border: `2px solid ${cardBorder}`,
-        color: mutedColor, fontSize: '0.88rem', fontWeight: 700, textAlign: 'center'
+        color: mutedColor, fontSize: '0.88rem', fontWeight: 700, textAlign: 'center',
+        ...style
       }}>
         Memuat peringkat absen malam...
       </div>
@@ -80,12 +82,13 @@ const AbsenMalamGamificationSection = ({
     <div style={{
       marginTop: '28px',
       backgroundColor: cardBg,
-      borderRadius: '28px',
+      borderRadius: '24px',
       padding: '24px 20px',
       border: `2px solid ${cardBorder}`,
       borderTop: '6px solid #F97316',
       boxShadow: isDark ? '0 8px 0 #4A2E1E' : '0 8px 0 #FFEDD5',
-      transition: 'all 0.3s ease'
+      transition: 'all 0.3s ease',
+      ...style
     }}>
       {/* Header */}
       <div style={{
