@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { auth, db, storage } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { getCookie, setCookie, getWeeklyResetTime } from '../utils/cookie';
+import { getCookie, setCookie, getWeeklyResetTime, getPiketRulesCache, setPiketRulesCache, canReportPiket, clearPiketCacheLocally } from '../utils/cookie';
 import { getGlobalWibDate } from '../utils/time';
 import { collection, getDocs, doc, addDoc, getDoc, query, where } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -59,6 +59,7 @@ const LaporPiket = () => {
   // State untuk Tab List & Data Piket
   const [listTab, setListTab] = useState('TODAY_ALL'); // 'TODAY_ALL' | 'MY_PENDING'
   const [myPikets, setMyPikets] = useState([]);
+  const [allMyPikets, setAllMyPikets] = useState([]);
   const [pendingPikets, setPendingPikets] = useState([]);
   const [todayPikets, setTodayPikets] = useState([]);
   const [loadingPending, setLoadingPending] = useState(true);
@@ -132,6 +133,7 @@ const LaporPiket = () => {
 
       // 2. Ambil seluruh data piket
       const piketSnap = await getDocs(collection(db, 'piket'));
+      const allMyList = [];
       const myList = [];
       const pendingList = [];
       const todayList = [];
@@ -179,6 +181,7 @@ const LaporPiket = () => {
           userPiketProdi: userPiketData?.prodi || '',
           userPiketFoto: userPiketData?.fotoProfil || '',
           userPiketJabatan: userPiketData?.jabatan || '',
+          laporToUid: laporToUid,
           laporToName: laporToUserData?.name || laporToUserData?.username || 'Pengurus',
           laporToUsername: laporToUserData?.username || '-',
           laporToJabatan: laporToUserData?.jabatan || '',
@@ -198,9 +201,12 @@ const LaporPiket = () => {
           )
         );
 
-        if (isMyPiket && !isVerified) {
-          myList.push(piketItem);
-          pendingList.push(piketItem);
+        if (isMyPiket) {
+          allMyList.push(piketItem);
+          if (!isVerified) {
+            myList.push(piketItem);
+            pendingList.push(piketItem);
+          }
         }
 
         // B. Piket Siapa Saja Yang Sudah Piket Hari Ini
@@ -210,10 +216,12 @@ const LaporPiket = () => {
       });
 
       // Urutkan dari yang paling baru
+      allMyList.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
       myList.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
       pendingList.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
       todayList.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
 
+      setAllMyPikets(allMyList);
       setMyPikets(myList);
       setPendingPikets(pendingList);
       setTodayPikets(todayList);
@@ -342,22 +350,65 @@ const LaporPiket = () => {
       return;
     }
 
-    // --- Rule Enforcement (cookie-based, reset tiap minggu jam 23:59 WIB) ---
-    const rules = getCookie('piketRules') || {};
+    // --- Rule Enforcement (Aturan 3 hari kalender setelah piket ke pengurus yang sama) ---
+    const currentUid = (auth.currentUser?.uid || currentUser?.uid || '').trim();
     const targetId = selectedLaporToUser.id;
     const now = Date.now();
-    const reportTimestamps = rules[targetId] || [];
 
-    if (reportTimestamps.length >= 3) {
-      alert('Anda telah mencapai batas laporan (3x) ke user ini minggu ini.');
-      return;
+    // 1. Cek reset cache piket dari MediAdigi (via Firestore databaseSPS/piket_cache_resets)
+    let resetTime = 0;
+    try {
+      const resetDocSnap = await getDoc(doc(db, 'databaseSPS', 'piket_cache_resets'));
+      if (resetDocSnap.exists()) {
+        const resetData = resetDocSnap.data();
+        const userReset = resetData.resets?.[currentUid] || 0;
+        const globalReset = resetData.globalReset || 0;
+        resetTime = Math.max(
+          typeof userReset === 'number' ? userReset : new Date(userReset).getTime() || 0,
+          typeof globalReset === 'number' ? globalReset : new Date(globalReset).getTime() || 0
+        );
+      }
+    } catch (err) {
+      console.warn('Gagal membaca piket_cache_resets:', err);
     }
-    if (reportTimestamps.length > 0) {
-      const lastReport = reportTimestamps[reportTimestamps.length - 1];
-      const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
-      if (now - lastReport < threeDaysMs) {
-        const nextAllowed = new Date(lastReport + threeDaysMs);
-        alert(`Harap tunggu minimal 3 hari sebelum melaporkan lagi ke user ini.\nBoleh lapor lagi mulai: ${nextAllowed.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}.`);
+
+    // 2. Cek riwayat laporan riil dari Firestore untuk user ini ke targetId
+    // Cari laporan terbaru ke user target ini yang TIDAK ditolak (status !== 'rejected')
+    const prevReportsToTarget = allMyPikets.filter(p => {
+      const pLaporTo = p.laporToUid || extractUid(p.laporTo);
+      return pLaporTo === targetId && p.status !== 'rejected';
+    });
+    const latestDbReport = prevReportsToTarget[0]; // Terurut desc berdasarkan timestamp
+    const latestDbTimestamp = latestDbReport?.timestamp ? latestDbReport.timestamp.getTime() : null;
+
+    // 3. Cek cache lokal (cookie + localStorage)
+    const cachedRules = getPiketRulesCache(currentUid);
+    const cachedTimestamp = cachedRules[targetId] || null;
+
+    // Tentukan timestamp laporan terakhir yang valid
+    // Prioritaskan Firestore ("aslinya") agar user tidak terjebak cache lokal yang usang / corrupt
+    let effectiveLastReport = null;
+    if (latestDbTimestamp) {
+      effectiveLastReport = latestDbTimestamp;
+    } else if (cachedTimestamp) {
+      // Jika di Firestore TIDAK ADA catatan lapor ke target ini sama sekali,
+      // jangan gunakan cache lokal karena kemungkinan itu peninggalan akun lain pada device ini
+      effectiveLastReport = null;
+    }
+
+    // Jika ada reset dari MediAdigi yang dilakukan setelah laporan terakhir, batalkan pembatasan
+    if (resetTime > 0 && effectiveLastReport && effectiveLastReport < resetTime) {
+      effectiveLastReport = null;
+      clearPiketCacheLocally(currentUid);
+    }
+
+    // 4. Validasi aturan 3 hari kalender
+    if (effectiveLastReport) {
+      const check = canReportPiket(effectiveLastReport, now);
+      if (!check.allowed) {
+        const lastDateFormatted = formatPiketDate(new Date(effectiveLastReport));
+        const nextAllowedFormatted = check.nextAllowedDate ? formatPiketDate(check.nextAllowedDate) : '-';
+        alert(`Anda sebelumnya telah melaporkan piket ke ${selectedLaporToUser.name || selectedLaporToUser.username} pada ${lastDateFormatted}.\n\nSesuai aturan piket asrama, pelapor tidak bisa melapor ke orang yang sama dalam 3 hari setelahnya (misal: Senin baru boleh lapor lagi Kamis).\n\nBoleh lapor lagi mulai: ${nextAllowedFormatted}.`);
         return;
       }
     }
@@ -391,12 +442,8 @@ const LaporPiket = () => {
 
       await addDoc(collection(db, 'piket'), piketData);
 
-      // Update rules cookie
-      const updatedTimestamps = [...reportTimestamps, now];
-      rules[targetId] = updatedTimestamps;
-      const resetTime = getWeeklyResetTime();
-      const daysUntilReset = Math.max(1, Math.ceil((resetTime - now) / 86400000));
-      setCookie('piketRules', rules, daysUntilReset);
+      // Update rules cache (cookie + localStorage)
+      setPiketRulesCache(currentUid, targetId, now);
 
       addNotification({
         title: 'Laporan Piket Terkirim',

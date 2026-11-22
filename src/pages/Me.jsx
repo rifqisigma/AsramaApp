@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { removeFCMToken } from '../context/fcmService';
+import { clearPiketCacheLocally } from '../utils/cookie';
 import { 
   ArrowLeft, 
   Mail, 
@@ -17,7 +18,13 @@ import {
   Brush,
   Clock,
   UserPlus,
-  Key
+  Key,
+  RotateCw,
+  Search,
+  X,
+  Trash2,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
@@ -27,6 +34,14 @@ const Me = () => {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
   const [userData, setUserData] = useState(null);
+
+  // State untuk Fitur Hapus Cache Piket Pengguna (MediAdigi)
+  const [showClearCacheModal, setShowClearCacheModal] = useState(false);
+  const [searchCacheUserQuery, setSearchCacheUserQuery] = useState('');
+  const [cacheUserResults, setCacheUserResults] = useState([]);
+  const [isSearchingCacheUser, setIsSearchingCacheUser] = useState(false);
+  const [cacheActionLoading, setCacheActionLoading] = useState(false);
+  const [cacheStatusMessage, setCacheStatusMessage] = useState({ text: '', type: '' });
 
   // Fetch User Data
   useEffect(() => {
@@ -88,6 +103,120 @@ const Me = () => {
     } catch (error) {
       console.error('Error logging out:', error);
     }
+  };
+
+  const handleSearchCacheUser = async () => {
+    if (!searchCacheUserQuery.trim()) return;
+    setIsSearchingCacheUser(true);
+    setCacheStatusMessage({ text: '', type: '' });
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      const queryLower = searchCacheUserQuery.trim().toLowerCase();
+      const results = [];
+      snap.forEach(d => {
+        const data = d.data();
+        const name = (data.name || '').toLowerCase();
+        const uname = (data.username || '').toLowerCase();
+        const angkatan = (data.angkatan || '').toString().toLowerCase();
+        if (name.includes(queryLower) || uname.includes(queryLower) || angkatan.includes(queryLower)) {
+          results.push({ id: d.id, ...data });
+        }
+      });
+      setCacheUserResults(results);
+      if (results.length === 0) {
+        setCacheStatusMessage({ text: 'Tidak ada pengguna yang cocok dengan pencarian.', type: 'info' });
+      }
+    } catch (err) {
+      console.error('Error searching user for cache reset:', err);
+      setCacheStatusMessage({ text: 'Gagal mencari pengguna. Coba lagi.', type: 'error' });
+    } finally {
+      setIsSearchingCacheUser(false);
+    }
+  };
+
+  const handleResetUserCache = async (targetUser) => {
+    const targetName = targetUser.name || targetUser.username || targetUser.id;
+    if (!window.confirm(`Hapus cache piket untuk ${targetName}?\n\nPengguna ini akan dibebaskan dari pembatasan 3 hari piket dan dapat segera melapor piket kembali.`)) {
+      return;
+    }
+
+    setCacheActionLoading(true);
+    try {
+      const cacheDocRef = doc(db, 'databaseSPS', 'piket_cache_resets');
+      const snap = await getDoc(cacheDocRef);
+      const existingData = snap.exists() ? snap.data() : { header: 'piket_cache_reset', resets: {} };
+      const currentResets = existingData.resets || {};
+
+      const now = Date.now();
+      await setDoc(cacheDocRef, {
+        header: 'piket_cache_reset',
+        resets: {
+          ...currentResets,
+          [targetUser.id]: now
+        },
+        lastUpdated: new Date(),
+        updatedBy: userData?.username || auth.currentUser?.email || 'mediadigi'
+      }, { merge: true });
+
+      // Jika target adalah akun yang sedang login di perangkat ini, hapus juga cookie lokalnya
+      if (targetUser.id === auth.currentUser?.uid) {
+        clearPiketCacheLocally(targetUser.id);
+      }
+
+      setCacheStatusMessage({
+        text: `Berhasil! Cache piket ${targetName} telah dihapus. Pengguna dapat melapor piket kembali.`,
+        type: 'success'
+      });
+    } catch (err) {
+      console.error('Gagal mereset cache piket user:', err);
+      setCacheStatusMessage({
+        text: 'Gagal mereset cache piket. Pastikan koneksi internet aktif.',
+        type: 'error'
+      });
+    } finally {
+      setCacheActionLoading(false);
+    }
+  };
+
+  const handleResetAllUsersCache = async () => {
+    if (!window.confirm('PERINGATAN: Yakin ingin mereset cache piket untuk SEMUA PENGGUNA?\n\nSeluruh penghuni asrama akan dibebaskan dari pembatasan 3 hari piket.')) {
+      return;
+    }
+
+    setCacheActionLoading(true);
+    try {
+      const cacheDocRef = doc(db, 'databaseSPS', 'piket_cache_resets');
+      const now = Date.now();
+      await setDoc(cacheDocRef, {
+        header: 'piket_cache_reset',
+        globalReset: now,
+        lastUpdated: new Date(),
+        updatedBy: userData?.username || auth.currentUser?.email || 'mediadigi'
+      }, { merge: true });
+
+      clearPiketCacheLocally(auth.currentUser?.uid);
+
+      setCacheStatusMessage({
+        text: 'Berhasil! Cache piket SEMUA pengguna telah direset.',
+        type: 'success'
+      });
+    } catch (err) {
+      console.error('Gagal reset global cache piket:', err);
+      setCacheStatusMessage({
+        text: 'Gagal mereset cache global. Coba lagi.',
+        type: 'error'
+      });
+    } finally {
+      setCacheActionLoading(false);
+    }
+  };
+
+  const handleClearLocalDeviceCache = () => {
+    clearPiketCacheLocally(auth.currentUser?.uid);
+    setCacheStatusMessage({
+      text: 'Cache dan cookie piket di perangkat ini berhasil dibersihkan!',
+      type: 'success'
+    });
   };
 
   return (
@@ -540,6 +669,49 @@ const Me = () => {
               <Key size={18} strokeWidth={3} />
               <span>Reset Password Penghuni</span>
             </button>
+
+            {/* Tombol Hapus Cache Piket Pengguna */}
+            <button
+              onClick={() => {
+                setShowClearCacheModal(true);
+                setCacheStatusMessage({ text: '', type: '' });
+                setCacheUserResults([]);
+                setSearchCacheUserQuery('');
+              }}
+              style={{
+                width: '100%',
+                backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                color: '#EA580C',
+                border: '2px solid #EA580C',
+                borderRadius: '20px',
+                padding: '12px',
+                fontSize: '0.95rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'transform 0.1s, box-shadow 0.1s',
+                outline: 'none'
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = 'translateY(2px)';
+                e.currentTarget.style.boxShadow = `0 2px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`;
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = 'translateY(0px)';
+                e.currentTarget.style.boxShadow = `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0px)';
+                e.currentTarget.style.boxShadow = `0 4px 0 ${isDark ? '#4A2E1E' : '#FFEDD5'}`;
+              }}
+            >
+              <RotateCw size={18} strokeWidth={3} />
+              <span>Hapus Cache Piket Pengguna</span>
+            </button>
           </div>
         </div>
       )}
@@ -698,6 +870,367 @@ const Me = () => {
           <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>Profile</span>
         </div>
       </div>
+
+      {/* Modal Hapus Cache Piket Pengguna (Fitur Khusus MediAdigi) */}
+      {showClearCacheModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: isDark ? '#2D1D13' : '#FFFFFF',
+            border: `2px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+            borderRadius: '28px',
+            width: '100%',
+            maxWidth: '440px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+            overflow: 'hidden',
+            fontFamily: '"Nunito", "Inter", sans-serif'
+          }}>
+            {/* Header Modal */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: `2px solid ${isDark ? '#3D291C' : '#FFF7ED'}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  padding: '8px',
+                  backgroundColor: '#FFF7ED',
+                  borderRadius: '12px',
+                  color: '#EA580C',
+                  display: 'flex'
+                }}>
+                  <RotateCw size={20} strokeWidth={3} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: isDark ? '#FFFFFF' : '#1F2937' }}>
+                    Hapus Cache Piket
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600, color: isDark ? '#FED7AA' : '#6B7280' }}>
+                    Panel MediAdigi
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowClearCacheModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: isDark ? '#FED7AA' : '#9CA3AF',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '10px',
+                  display: 'flex'
+                }}
+              >
+                <X size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            {/* Body Modal (Scrollable) */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              {/* Alert Info Banner */}
+              <div style={{
+                backgroundColor: isDark ? '#3D291C' : '#FFF7ED',
+                border: `1.5px solid ${isDark ? '#9A3412' : '#FDBA74'}`,
+                borderRadius: '16px',
+                padding: '12px 14px',
+                display: 'flex',
+                gap: '10px',
+                alignItems: 'flex-start'
+              }}>
+                <AlertCircle size={20} color="#EA580C" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <p style={{ margin: 0, fontSize: '0.82rem', lineHeight: 1.4, color: isDark ? '#FED7AA' : '#9A3412', fontWeight: 600 }}>
+                  Gunakan fitur ini jika pengguna mengeluhkan tidak bisa melapor piket ke pengurus karena tertahan aturan 3 hari, padahal waktu pelaporan sudah sesuai atau laporan sebelumnya sudah lama.
+                </p>
+              </div>
+
+              {/* Status Message (Success / Error / Info) */}
+              {cacheStatusMessage.text && (
+                <div style={{
+                  padding: '12px 14px',
+                  borderRadius: '14px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backgroundColor: cacheStatusMessage.type === 'success'
+                    ? (isDark ? '#064E3B' : '#ECFDF5')
+                    : cacheStatusMessage.type === 'error'
+                      ? (isDark ? '#7F1D1D' : '#FEF2F2')
+                      : (isDark ? '#1E293B' : '#F1F5F9'),
+                  color: cacheStatusMessage.type === 'success'
+                    ? '#059669'
+                    : cacheStatusMessage.type === 'error'
+                      ? '#DC2626'
+                      : (isDark ? '#94A3B8' : '#475569'),
+                  border: `1.5px solid ${
+                    cacheStatusMessage.type === 'success'
+                      ? '#10B981'
+                      : cacheStatusMessage.type === 'error'
+                        ? '#EF4444'
+                        : '#CBD5E1'
+                  }`
+                }}>
+                  {cacheStatusMessage.type === 'success' ? (
+                    <CheckCircle2 size={18} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                  ) : cacheStatusMessage.type === 'error' ? (
+                    <AlertCircle size={18} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                  ) : null}
+                  <span>{cacheStatusMessage.text}</span>
+                </div>
+              )}
+
+              {/* Section 1: Cari & Hapus Cache User Tertentu */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 800, color: isDark ? '#FFFFFF' : '#374151' }}>
+                  1. Cari Pengguna untuk Dihapus Cachenya:
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{
+                    position: 'relative',
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                    <input
+                      type="text"
+                      placeholder="Ketik nama, username, angkatan..."
+                      value={searchCacheUserQuery}
+                      onChange={(e) => setSearchCacheUserQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSearchCacheUser();
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '14px',
+                        border: `2px solid ${isDark ? '#4A2E1E' : '#FED7AA'}`,
+                        backgroundColor: isDark ? '#1E130C' : '#FFFFFF',
+                        color: isDark ? '#FFFFFF' : '#1F2937',
+                        fontSize: '0.9rem',
+                        fontWeight: 600,
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSearchCacheUser}
+                    disabled={isSearchingCacheUser || !searchCacheUserQuery.trim()}
+                    style={{
+                      padding: '10px 16px',
+                      backgroundColor: '#F97316',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '14px',
+                      fontWeight: 800,
+                      fontSize: '0.88rem',
+                      cursor: (isSearchingCacheUser || !searchCacheUserQuery.trim()) ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 3px 0 #C2410C',
+                      opacity: (isSearchingCacheUser || !searchCacheUserQuery.trim()) ? 0.6 : 1
+                    }}
+                  >
+                    <Search size={16} strokeWidth={2.5} />
+                    <span>{isSearchingCacheUser ? 'Mencari...' : 'Cari'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Hasil Pencarian User */}
+              {cacheUserResults.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  maxHeight: '180px',
+                  overflowY: 'auto',
+                  paddingRight: '4px'
+                }}>
+                  {cacheUserResults.map((u) => (
+                    <div
+                      key={u.id}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '14px',
+                        backgroundColor: isDark ? '#3D291C' : '#FFF9F5',
+                        border: `1.5px solid ${isDark ? '#4A2E1E' : '#FFEDD5'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px'
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <p style={{
+                          margin: 0,
+                          fontSize: '0.9rem',
+                          fontWeight: 800,
+                          color: isDark ? '#FFFFFF' : '#1F2937',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {u.name || u.username}
+                        </p>
+                        <p style={{
+                          margin: '2px 0 0 0',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: isDark ? '#FED7AA' : '#6B7280'
+                        }}>
+                          @{u.username} • Angkatan {u.angkatan || '-'} {u.jabatan ? `• ${u.jabatan}` : ''}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleResetUserCache(u)}
+                        disabled={cacheActionLoading}
+                        style={{
+                          padding: '8px 12px',
+                          backgroundColor: '#EA580C',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '12px',
+                          fontSize: '0.8rem',
+                          fontWeight: 800,
+                          cursor: cacheActionLoading ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 0 #9A3412',
+                          flexShrink: 0
+                        }}
+                      >
+                        <Trash2 size={14} strokeWidth={2.5} />
+                        <span>Hapus Cache</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Divider */}
+              <div style={{
+                height: '1px',
+                backgroundColor: isDark ? '#3D291C' : '#E5E7EB',
+                margin: '4px 0'
+              }} />
+
+              {/* Section 2: Aksi Global & Perangkat Lokal */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ fontSize: '0.9rem', fontWeight: 800, color: isDark ? '#FFFFFF' : '#374151' }}>
+                  2. Aksi Khusus & Darurat:
+                </label>
+
+                {/* Reset Semua User */}
+                <button
+                  type="button"
+                  onClick={handleResetAllUsersCache}
+                  disabled={cacheActionLoading}
+                  style={{
+                    width: '100%',
+                    padding: '11px 14px',
+                    backgroundColor: isDark ? '#450A0A' : '#FEF2F2',
+                    color: '#DC2626',
+                    border: '1.5px solid #F87171',
+                    borderRadius: '16px',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    cursor: cacheActionLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: `0 3px 0 ${isDark ? '#7F1D1D' : '#FCA5A5'}`
+                  }}
+                >
+                  <RotateCw size={16} strokeWidth={3} />
+                  <span>Reset Cache Piket Semua Pengguna (Global)</span>
+                </button>
+
+                {/* Reset Perangkat Ini */}
+                <button
+                  type="button"
+                  onClick={handleClearLocalDeviceCache}
+                  style={{
+                    width: '100%',
+                    padding: '11px 14px',
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    color: isDark ? '#94A3B8' : '#64748B',
+                    border: `1.5px solid ${isDark ? '#334155' : '#CBD5E1'}`,
+                    borderRadius: '16px',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Trash2 size={16} strokeWidth={2.5} />
+                  <span>Bersihkan Cache & Cookie di Perangkat Ini</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Footer Modal */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderTop: `2px solid ${isDark ? '#3D291C' : '#FFF7ED'}`,
+              display: 'flex',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                type="button"
+                onClick={() => setShowClearCacheModal(false)}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: isDark ? '#3D291C' : '#F3F4F6',
+                  color: isDark ? '#FED7AA' : '#4B5563',
+                  border: 'none',
+                  borderRadius: '14px',
+                  fontSize: '0.9rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
     </div>
