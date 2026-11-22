@@ -1,0 +1,46 @@
+rules_version = '2';
+
+// ============================================================
+// Storage Security Rules — Asrama IPB Sukasari (GABUNGAN web + app)
+// ------------------------------------------------------------
+// Baca: publik. Tulis: per folder.
+//   - berita/**, site/** : hanya admin
+//   - oprec/**           : pengguna login
+//   - alumni/**          : admin, atau pengajuan publik (gambar < 5MB)
+//   - AsramaApp/**       : pengguna login (/app: foto profil, lampiran)
+// ============================================================
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+          && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true)
+        || (firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+          && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.jabatan
+              in ["ketua", "wakil ketua", "kepenghunian"])
+        || firestore.exists(/databases/(default)/documents/admins/$(request.auth.token.email))
+      );
+    }
+
+    function isImageUnder5MB() {
+      return request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Semua file boleh dibaca publik.
+    match /{allPaths=**} {
+      allow read: if true;
+    }
+
+    match /berita/{allPaths=**}   { allow write: if isAdmin(); }
+    match /site/{allPaths=**}     { allow write: if isAdmin(); }
+    match /oprec/{allPaths=**}    { allow write: if isSignedIn(); }
+    match /alumni/{allPaths=**}   { allow write: if isAdmin() || (request.auth == null && isImageUnder5MB()); }
+    match /AsramaApp/{allPaths=**} { allow write: if isSignedIn(); }
+  }
+}

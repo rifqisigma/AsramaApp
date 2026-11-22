@@ -7,6 +7,9 @@
       "hosting": {
         "ais": [
           "internal-web-ais"
+        ],
+        "website": [
+          "asrama-ipb-sukasari"
         ]
       }
     }

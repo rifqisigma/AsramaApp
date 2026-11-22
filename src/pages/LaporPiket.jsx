@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { auth, db, storage } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getCookie, setCookie, getWeeklyResetTime, getPiketRulesCache, setPiketRulesCache, canReportPiket, clearPiketCacheLocally } from '../utils/cookie';
@@ -9,6 +9,9 @@ import { ArrowLeft, Upload, CheckCircle, Search, ExternalLink, Loader, Clock, Ro
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
+import PiketGamificationSection from '../components/PiketGamificationSection';
+import { usePiketGamification } from '../hooks/usePiketGamification';
+import { getTodayDayKey } from '../utils/piketGamification';
 
 const LaporPiket = () => {
   const navigate = useNavigate();
@@ -72,6 +75,36 @@ const LaporPiket = () => {
   const [filterTodayStatus, setFilterTodayStatus] = useState('ALL'); // 'ALL' | 'verified' | 'pending'
 
   const [previewMedia, setPreviewMedia] = useState(null); // { url, type }
+
+  // Gamifikasi Piket (Perangkingan & Juara Piket)
+  const {
+    rawRecords: piketGamificationRecords,
+    loading: loadingGamification,
+    todayKey: gamificationTodayKey,
+    latestDayKey: gamificationLatestDayKey,
+    getRecapForMonth: getPiketRecapForMonth,
+    getLeaderboardForMonth: getPiketLeaderboardForMonth,
+    getUser: getGamificationUser,
+  } = usePiketGamification();
+
+  const defaultGamificationDay = useMemo(() => {
+    const available = new Set(piketGamificationRecords.map((r) => r.dayKey));
+    return available.has(gamificationTodayKey) ? gamificationTodayKey : gamificationLatestDayKey;
+  }, [piketGamificationRecords, gamificationTodayKey, gamificationLatestDayKey]);
+
+  const activeGamificationDay = defaultGamificationDay || gamificationTodayKey;
+  const activeGamificationMonth = activeGamificationDay ? activeGamificationDay.slice(0, 7) : getTodayDayKey().slice(0, 7);
+
+  const monthPiketRecap = useMemo(
+    () => (activeGamificationMonth ? getPiketRecapForMonth(activeGamificationMonth) : new Map()),
+    [activeGamificationMonth, getPiketRecapForMonth]
+  );
+
+  const currentDayRecap = monthPiketRecap.get(activeGamificationDay) || null;
+  const currentPiketLeaderboard = useMemo(
+    () => (activeGamificationMonth ? getPiketLeaderboardForMonth(activeGamificationMonth) : []),
+    [activeGamificationMonth, getPiketLeaderboardForMonth]
+  );
 
   // Helper untuk ekstrak UID dari field Firestore (mendukung DocRef, string, object)
   const extractUid = (field) => {
@@ -928,6 +961,20 @@ const LaporPiket = () => {
           `}</style>
 
         </form>
+
+        {/* ========================================================================= */}
+        {/* SECTION: GAMIFIKASI PIKET (JUARA PIKET HARIAN) */}
+        {/* ========================================================================= */}
+        <PiketGamificationSection
+          dayRecap={currentDayRecap}
+          leaderboard={currentPiketLeaderboard}
+          getUser={getGamificationUser}
+          dayKey={activeGamificationDay}
+          monthKey={activeGamificationMonth}
+          loading={loadingGamification}
+          theme={theme}
+          style={{ marginTop: '24px', marginBottom: '24px' }}
+        />
 
         {/* ========================================================================= */}
         {/* SECTION: TABS DAFTAR PIKET (HARI INI & MILIK SAYA) */}
